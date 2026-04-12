@@ -1,30 +1,36 @@
 //
-//  ElevenLabsTTSClient.swift
+//  OpenAICompatibleTTSClient.swift
 //  leanring-buddy
 //
-//  Streams text-to-speech audio from ElevenLabs and plays it back
-//  through the system audio output. Uses the streaming endpoint so
-//  playback begins before the full audio has been generated.
+//  TTS client for OpenAI-compatible endpoints (SiliconFlow CosyVoice2, etc.).
+//  Uses the standard /v1/audio/speech format. Drop-in replacement for
+//  ElevenLabsTTSClient — same method signatures.
 //
 
 import AVFoundation
 import Foundation
 
 @MainActor
-final class ElevenLabsTTSClient {
-    private let proxyURL: URL
-    private let apiKey: String?
+final class OpenAICompatibleTTSClient {
+    private let apiURL: URL
+    private let apiKey: String
     private let modelID: String
+    private let voice: String
     private let session: URLSession
 
-    /// The audio player for the current TTS playback. Kept alive so the
-    /// audio finishes playing even if the caller doesn't hold a reference.
+    /// The audio player for the current TTS playback.
     private var audioPlayer: AVAudioPlayer?
 
-    init(proxyURL: String, apiKey: String? = nil, model: String = "eleven_flash_v2_5") {
-        self.proxyURL = URL(string: proxyURL)!
+    init(baseURL: String, apiKey: String, model: String = "CosyVoice2-0.5B", voice: String = "alloy") {
+        let cleanedBaseURL = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
+        if baseURL.hasSuffix("/audio/speech") {
+            self.apiURL = URL(string: baseURL)!
+        } else {
+            self.apiURL = URL(string: "\(cleanedBaseURL)/audio/speech")!
+        }
         self.apiKey = apiKey
         self.modelID = model
+        self.voice = voice
 
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30
@@ -32,26 +38,18 @@ final class ElevenLabsTTSClient {
         self.session = URLSession(configuration: configuration)
     }
 
-    /// Sends `text` to ElevenLabs TTS and plays the resulting audio.
+    /// Sends `text` to the TTS endpoint and plays the resulting audio.
     /// Throws on network or decoding errors. Cancellation-safe.
     func speakText(_ text: String) async throws {
-        var request = URLRequest(url: proxyURL)
+        var request = URLRequest(url: apiURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("audio/mpeg", forHTTPHeaderField: "Accept")
-        // In direct mode, the app sends the API key itself.
-        // In proxy mode, the Worker adds it server-side.
-        if let apiKey, !apiKey.isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
-        }
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
         let body: [String: Any] = [
-            "text": text,
-            "model_id": modelID,
-            "voice_settings": [
-                "stability": 0.5,
-                "similarity_boost": 0.75
-            ]
+            "model": modelID,
+            "input": text,
+            "voice": voice
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -59,13 +57,13 @@ final class ElevenLabsTTSClient {
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(domain: "ElevenLabsTTS", code: -1,
+            throw NSError(domain: "OpenAICompatibleTTS", code: -1,
                           userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw NSError(domain: "ElevenLabsTTS", code: httpResponse.statusCode,
+            throw NSError(domain: "OpenAICompatibleTTS", code: httpResponse.statusCode,
                           userInfo: [NSLocalizedDescriptionKey: "TTS API error (\(httpResponse.statusCode)): \(errorBody)"])
         }
 
@@ -74,7 +72,7 @@ final class ElevenLabsTTSClient {
         let player = try AVAudioPlayer(data: data)
         self.audioPlayer = player
         player.play()
-        print("🔊 ElevenLabs TTS: playing \(data.count / 1024)KB audio")
+        print("🔊 OpenAI-compatible TTS: playing \(data.count / 1024)KB audio")
     }
 
     /// Whether TTS audio is currently playing back.

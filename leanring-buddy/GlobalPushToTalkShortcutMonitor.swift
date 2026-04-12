@@ -15,6 +15,10 @@ import Foundation
 final class GlobalPushToTalkShortcutMonitor: ObservableObject {
     let shortcutTransitionPublisher = PassthroughSubject<BuddyPushToTalkShortcut.ShortcutTransition, Never>()
 
+    /// Fires once when the user presses Cmd+Shift+Space to open the
+    /// cursor-following text input popup.
+    let textInputShortcutPublisher = PassthroughSubject<Void, Never>()
+
     private var globalEventTap: CFMachPort?
     private var globalEventTapRunLoopSource: CFRunLoopSource?
     /// Mutated exclusively from the CGEvent tap callback, which runs on
@@ -125,6 +129,17 @@ final class GlobalPushToTalkShortcutMonitor: ObservableObject {
         case .released:
             isShortcutCurrentlyPressed = false
             shortcutTransitionPublisher.send(.released)
+        }
+
+        // Detect Cmd+Shift+Space for the cursor text input popup.
+        // keyCode 49 = Space bar. Only fires on keyDown to avoid double-fire.
+        if eventType == .keyDown {
+            let flags = event.flags
+            let isCmdShiftPressed = flags.contains(.maskCommand) && flags.contains(.maskShift)
+            let isSpaceKey = eventKeyCode == 49
+            if isCmdShiftPressed && isSpaceKey {
+                textInputShortcutPublisher.send()
+            }
         }
 
         return Unmanaged.passUnretained(event)

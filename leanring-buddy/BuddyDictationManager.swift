@@ -466,7 +466,7 @@ final class BuddyDictationManager: NSObject, ObservableObject {
             isPreparingToRecord = false
             lastErrorMessage = userFacingErrorMessage(
                 from: error,
-                fallback: "couldn't start voice input. try again."
+                fallback: String(localized: "couldn't start voice input. try again.")
             )
             print("❌ BuddyDictationManager: failed to start recognition session (\(transcriptionProvider.displayName)): \(error)")
             resetSessionState()
@@ -572,7 +572,7 @@ final class BuddyDictationManager: NSObject, ObservableObject {
             print("❌ Buddy dictation error (\(transcriptionProvider.displayName)): \(error)")
             lastErrorMessage = userFacingErrorMessage(
                 from: error,
-                fallback: "couldn't transcribe that. try again."
+                fallback: String(localized: "couldn't transcribe that. try again.")
             )
             cancelCurrentDictation(preserveDraftText: false)
         }
@@ -736,7 +736,7 @@ final class BuddyDictationManager: NSObject, ObservableObject {
     private func requestMicrophoneAndSpeechPermissionsIfNeeded() async -> Bool {
         let hasMicrophonePermission = await requestMicrophonePermissionIfNeeded()
         guard hasMicrophonePermission else {
-            lastErrorMessage = "microphone permission is required for push to talk."
+            lastErrorMessage = String(localized: "microphone permission is required for push to talk.")
             return false
         }
 
@@ -746,7 +746,7 @@ final class BuddyDictationManager: NSObject, ObservableObject {
 
         let hasSpeechRecognitionPermission = await requestSpeechRecognitionPermissionIfNeeded()
         guard hasSpeechRecognitionPermission else {
-            lastErrorMessage = "speech recognition permission is required for push to talk."
+            lastErrorMessage = String(localized: "speech recognition permission is required for push to talk.")
             return false
         }
 

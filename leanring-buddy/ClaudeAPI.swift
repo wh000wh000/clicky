@@ -12,11 +12,13 @@ class ClaudeAPI {
 
     private let apiURL: URL
     var model: String
+    private let apiKey: String?
     private let session: URLSession
 
-    init(proxyURL: String, model: String = "claude-sonnet-4-6") {
+    init(proxyURL: String, model: String = "claude-sonnet-4-6", apiKey: String? = nil) {
         self.apiURL = URL(string: proxyURL)!
         self.model = model
+        self.apiKey = apiKey
 
         // Use .default instead of .ephemeral so TLS session tickets are cached.
         // Ephemeral sessions do a full TLS handshake on every request, which causes
@@ -41,6 +43,12 @@ class ClaudeAPI {
         request.httpMethod = "POST"
         request.timeoutInterval = 120
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // In direct mode, the app sends the API key and version header itself.
+        // In proxy mode, the Worker adds these server-side.
+        if let apiKey, !apiKey.isEmpty {
+            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        }
         return request
     }
 
