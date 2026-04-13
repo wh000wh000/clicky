@@ -40,11 +40,17 @@ final class OpenAICompatibleTTSClient {
 
     /// Sends `text` to the TTS endpoint and plays the resulting audio.
     /// Throws on network or decoding errors. Cancellation-safe.
-    func speakText(_ text: String) async throws {
+    func speakText(_ text: String, bearerToken: String? = nil) async throws {
         var request = URLRequest(url: apiURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        // In proxy mode a bearerToken (Supabase JWT) is provided instead of the
+        // real API key. The Worker verifies the JWT and adds the key server-side.
+        if let bearerToken, !bearerToken.isEmpty {
+            request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
 
         let body: [String: Any] = [
             "model": modelID,

@@ -30,11 +30,6 @@ protocol BuddyTranscriptionProvider {
 }
 
 enum BuddyTranscriptionProviderFactory {
-    private enum PreferredProvider: String {
-        case assemblyAI = "assemblyai"
-        case openAI = "openai"
-        case appleSpeech = "apple"
-    }
 
     static func makeDefaultProvider() -> any BuddyTranscriptionProvider {
         let provider = resolveProvider()
@@ -43,58 +38,39 @@ enum BuddyTranscriptionProviderFactory {
     }
 
     private static func resolveProvider() -> any BuddyTranscriptionProvider {
-        let preferredProviderRawValue = AppBundleConfiguration
-            .stringValue(forKey: "VoiceTranscriptionProvider")?
-            .lowercased()
-        let preferredProvider = preferredProviderRawValue.flatMap(PreferredProvider.init(rawValue:))
+        // Read from APIConfiguration (runtime user preference) so the user's
+        // in-app selection takes effect without an app restart.
+        let configuredProvider = APIConfiguration.shared.sttProvider
 
-        let assemblyAIProvider = AssemblyAIStreamingTranscriptionProvider()
-        let openAIProvider = OpenAIAudioTranscriptionProvider()
-
-        if preferredProvider == .appleSpeech {
+        switch configuredProvider {
+        case .whisperKit:
+            let whisperKitProvider = WhisperKitTranscriptionProvider()
+            if whisperKitProvider.isConfigured {
+                return whisperKitProvider
+            }
+            // Model not downloaded yet — fall back to Apple Speech silently.
+            // The panel UI informs the user about the download requirement.
+            print("⚠️ Transcription: WhisperKit selected but not ready, falling back to Apple Speech")
             return AppleSpeechTranscriptionProvider()
-        }
 
-        if preferredProvider == .assemblyAI {
+        case .apple:
+            return AppleSpeechTranscriptionProvider()
+
+        case .assemblyAI:
+            let assemblyAIProvider = AssemblyAIStreamingTranscriptionProvider()
             if assemblyAIProvider.isConfigured {
                 return assemblyAIProvider
             }
-
             print("⚠️ Transcription: AssemblyAI preferred but not configured, falling back")
-
-            if openAIProvider.isConfigured {
-                print("⚠️ Transcription: using OpenAI as fallback")
-                return openAIProvider
-            }
-
-            print("⚠️ Transcription: using Apple Speech as fallback")
             return AppleSpeechTranscriptionProvider()
-        }
 
-        if preferredProvider == .openAI {
+        case .openAI:
+            let openAIProvider = OpenAIAudioTranscriptionProvider()
             if openAIProvider.isConfigured {
                 return openAIProvider
             }
-
             print("⚠️ Transcription: OpenAI preferred but not configured, falling back")
-
-            if assemblyAIProvider.isConfigured {
-                print("⚠️ Transcription: using AssemblyAI as fallback")
-                return assemblyAIProvider
-            }
-
-            print("⚠️ Transcription: using Apple Speech as fallback")
             return AppleSpeechTranscriptionProvider()
         }
-
-        if assemblyAIProvider.isConfigured {
-            return assemblyAIProvider
-        }
-
-        if openAIProvider.isConfigured {
-            return openAIProvider
-        }
-
-        return AppleSpeechTranscriptionProvider()
     }
 }

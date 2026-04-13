@@ -169,6 +169,8 @@ struct APISettingsView: View {
 
     // MARK: - STT
 
+    @ObservedObject private var whisperKitManager = WhisperKitModelManager.shared
+
     private var sttSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("Speech-to-Text (STT)")
@@ -183,15 +185,109 @@ struct APISettingsView: View {
                         Text(provider.displayName).tag(provider)
                     }
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 240)
+                .pickerStyle(.menu)
+                .frame(width: 200)
             }
 
-            if apiConfiguration.sttProvider != .apple {
+            if apiConfiguration.sttProvider == .whisperKit {
+                whisperKitStatusBlock
+            } else if apiConfiguration.sttProvider != .apple {
                 configTextField(label: "Base URL", text: $apiConfiguration.sttAPIBaseURL)
                 configSecureField(label: "API Key", text: $sttAPIKeyLocal)
             }
         }
+    }
+
+    private var whisperKitStatusBlock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("On-Device Voice Model")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(DS.Colors.textSecondary)
+                    Text("Model: \(WhisperKitModelManager.modelVariant)  ·  \(WhisperKitModelManager.approximateModelSizeDescription), one-time download")
+                        .font(.system(size: 10))
+                        .foregroundColor(DS.Colors.textTertiary)
+                }
+                Spacer()
+            }
+
+            switch whisperKitManager.modelState {
+            case .notDownloaded:
+                Button(action: { WhisperKitModelManager.shared.startDownload() }) {
+                    Text("Download Model")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(DS.Colors.textOnAccent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(
+                            RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
+                                .fill(DS.Colors.accent)
+                        )
+                }
+                .buttonStyle(.plain)
+                .pointerCursor()
+
+            case .downloading(let progress):
+                VStack(spacing: 6) {
+                    HStack {
+                        Text("Downloading…")
+                            .font(.system(size: 11))
+                            .foregroundColor(DS.Colors.textSecondary)
+                        Spacer()
+                        Text("\(Int(progress * 100))%")
+                            .font(.system(size: 11, weight: .medium).monospacedDigit())
+                            .foregroundColor(DS.Colors.textTertiary)
+                    }
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                        .tint(DS.Colors.accent)
+                    Button(action: { WhisperKitModelManager.shared.cancelDownload() }) {
+                        Text("Cancel")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(DS.Colors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    .pointerCursor()
+                }
+
+            case .ready:
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(DS.Colors.success)
+                        .frame(width: 7, height: 7)
+                    Text("Model ready — on-device transcription active")
+                        .font(.system(size: 11))
+                        .foregroundColor(DS.Colors.success)
+                }
+
+            case .failed(let message):
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Download failed: \(message)")
+                        .font(.system(size: 10))
+                        .foregroundColor(.red.opacity(0.8))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(action: { WhisperKitModelManager.shared.startDownload() }) {
+                        Text("Retry Download")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(DS.Colors.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: DS.CornerRadius.small, style: .continuous)
+                                    .fill(Color.white.opacity(0.06))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DS.CornerRadius.small, style: .continuous)
+                                    .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .pointerCursor()
+                }
+            }
+        }
+        .animation(.easeInOut(duration: DS.Animation.normal), value: whisperKitManager.modelState)
     }
 
     // MARK: - Element Detection

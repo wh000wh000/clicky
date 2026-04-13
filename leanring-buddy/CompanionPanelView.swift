@@ -12,8 +12,18 @@ import SwiftUI
 
 struct CompanionPanelView: View {
     @ObservedObject var companionManager: CompanionManager
+    @ObservedObject private var supabaseAuthManager = SupabaseAuthManager.shared
+    @ObservedObject private var apiConfig = APIConfiguration.shared
+    @ObservedObject private var whisperKitManager = WhisperKitModelManager.shared
     @State private var textQueryInput: String = ""
     @State private var showAPISettings: Bool = false
+    @State private var signInEmail: String = ""
+    @State private var signInPassword: String = ""
+    @State private var isSigningIn: Bool = false
+    @State private var signInErrorMessage: String? = nil
+    @State private var isSignUpMode: Bool = false
+    @State private var awaitingEmailConfirmation: Bool = false
+    @State private var confirmationEmail: String = ""
     @FocusState private var isTextQueryFieldFocused: Bool
 
     var body: some View {
@@ -33,6 +43,14 @@ struct CompanionPanelView: View {
 
                 modelPickerRow
                     .padding(.horizontal, 16)
+
+                if apiConfig.sttProvider == .whisperKit {
+                    Spacer()
+                        .frame(height: 8)
+
+                    voiceEngineRow
+                        .padding(.horizontal, 16)
+                }
             }
 
             if !companionManager.allPermissionsGranted {
@@ -79,6 +97,15 @@ struct CompanionPanelView: View {
                     .frame(height: 16)
 
                 dmFarzaButton
+                    .padding(.horizontal, 16)
+            }
+
+            // Show auth row only in proxy mode (direct mode users supply their own keys).
+            if apiConfig.chatAPIMode == .proxy {
+                Spacer()
+                    .frame(height: 12)
+
+                authSection
                     .padding(.horizontal, 16)
             }
 
@@ -751,6 +778,383 @@ struct CompanionPanelView: View {
         }
         .buttonStyle(.plain)
         .pointerCursor()
+    }
+
+    // MARK: - Auth Section
+
+    /// Compact authentication row shown in proxy mode.
+    /// Displays an Apple Sign In button when signed out, or the user's email
+    /// with a sign-out affordance when signed in.
+    // MARK: - Voice Engine Row
+
+    @ViewBuilder
+    private var voiceEngineRow: some View {
+        HStack {
+            HStack(spacing: 6) {
+                Image(systemName: "waveform.circle")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(DS.Colors.textTertiary)
+                    .frame(width: 16)
+
+                Text("Voice Engine")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(DS.Colors.textSecondary)
+            }
+
+            Spacer()
+
+            switch whisperKitManager.modelState {
+            case .notDownloaded:
+                Button(action: { companionManager.startWhisperKitDownload() }) {
+                    Text("Download")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(DS.Colors.textOnAccent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(DS.Colors.accent))
+                }
+                .buttonStyle(.plain)
+                .pointerCursor()
+
+            case .downloading(let progress):
+                HStack(spacing: 6) {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.white.opacity(0.1))
+                                .frame(height: 6)
+                            Capsule()
+                                .fill(DS.Colors.accent)
+                                .frame(
+                                    width: max(geometry.size.width * progress, 4),
+                                    height: 6
+                                )
+                        }
+                    }
+                    .frame(width: 70, height: 6)
+
+                    Text("\(Int(progress * 100))%")
+                        .font(.system(size: 10, weight: .medium).monospacedDigit())
+                        .foregroundColor(DS.Colors.textTertiary)
+                        .frame(width: 28, alignment: .trailing)
+
+                    Button(action: { companionManager.cancelWhisperKitDownload() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(DS.Colors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                    .pointerCursor()
+                }
+
+            case .ready:
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(DS.Colors.success)
+                        .frame(width: 6, height: 6)
+                    Text("Ready")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(DS.Colors.success)
+                }
+
+            case .failed:
+                Button(action: { companionManager.startWhisperKitDownload() }) {
+                    Text("Retry")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(DS.Colors.warning)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .stroke(DS.Colors.warning.opacity(0.5), lineWidth: 0.8)
+                        )
+                }
+                .buttonStyle(.plain)
+                .pointerCursor()
+            }
+        }
+        .padding(.vertical, 4)
+        .animation(.easeInOut(duration: DS.Animation.normal), value: whisperKitManager.modelState)
+    }
+
+    // MARK: - Auth Section
+
+    private var authSection: some View {
+        Group {
+            if supabaseAuthManager.isAuthenticated {
+                signedInRow
+            } else if awaitingEmailConfirmation {
+                emailConfirmationPendingView
+            } else {
+                signInFormView
+            }
+        }
+    }
+
+    private var signedInRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "person.fill")
+                .font(.system(size: 11))
+                .foregroundColor(DS.Colors.textTertiary)
+
+            Text(supabaseAuthManager.currentSession?.user.email ?? "已登录")
+                .font(.system(size: 11))
+                .foregroundColor(DS.Colors.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Spacer()
+
+            Button(action: {
+                supabaseAuthManager.signOut()
+            }) {
+                Text("退出")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(DS.Colors.textTertiary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(Color.white.opacity(0.07))
+                    )
+            }
+            .buttonStyle(.plain)
+            .pointerCursor()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
+                .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
+        )
+    }
+
+    private var signInFormView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Signup mode header — accent color signals this is a different flow from login
+            if isSignUpMode {
+                HStack(spacing: 6) {
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(DS.Colors.accent)
+                    Text("创建账号")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(DS.Colors.accent)
+                }
+                .padding(.bottom, 2)
+            }
+
+            // Email field
+            TextField("邮箱", text: $signInEmail)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundColor(DS.Colors.textPrimary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
+                )
+                .autocorrectionDisabled()
+
+            // Password field — with minimum length hint shown only in signup mode
+            VStack(alignment: .leading, spacing: 3) {
+                SecureField("密码", text: $signInPassword)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                    .foregroundColor(DS.Colors.textPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.white.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
+                    )
+                    .onSubmit { performAuthAction() }
+
+                if isSignUpMode {
+                    Text("至少 6 个字符")
+                        .font(.system(size: 10))
+                        .foregroundColor(DS.Colors.textTertiary)
+                        .padding(.horizontal, 2)
+                }
+            }
+
+            // Submit button — accent fill in signup mode for visual distinction,
+            // neutral fill in login mode to avoid confusion between the two flows.
+            Button(action: performAuthAction) {
+                HStack(spacing: 6) {
+                    if isSigningIn {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                            .frame(width: 14, height: 14)
+                    }
+                    Text(isSigningIn
+                         ? (isSignUpMode ? "注册中…" : "登录中…")
+                         : (isSignUpMode ? "注册" : "登录"))
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(isSignUpMode ? DS.Colors.textOnAccent : DS.Colors.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isSignUpMode ? DS.Colors.accent : Color.white.opacity(0.12))
+                )
+            }
+            .buttonStyle(.plain)
+            .pointerCursor()
+            .disabled(isSigningIn || signInEmail.isEmpty || signInPassword.isEmpty)
+
+            // Toggle between login and signup modes
+            HStack {
+                Text(isSignUpMode ? "已有账号？" : "没有账号？")
+                    .font(.system(size: 10))
+                    .foregroundColor(DS.Colors.textTertiary)
+
+                Button(action: {
+                    isSignUpMode.toggle()
+                    signInErrorMessage = nil
+                }) {
+                    Text(isSignUpMode ? "去登录" : "去注册")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(DS.Colors.textSecondary)
+                        .underline()
+                }
+                .buttonStyle(.plain)
+                .pointerCursor()
+            }
+
+            if let errorMessage = signInErrorMessage {
+                Text(errorMessage)
+                    .font(.system(size: 10))
+                    .foregroundColor(.red.opacity(0.8))
+                    .lineLimit(3)
+                    .padding(.horizontal, 2)
+            }
+        }
+    }
+
+    private var emailConfirmationPendingView: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "envelope.badge.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(DS.Colors.accent)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("确认邮箱")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(DS.Colors.textPrimary)
+                    Text("确认邮件已发送至 \(confirmationEmail)")
+                        .font(.system(size: 10))
+                        .foregroundColor(DS.Colors.textTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 6) {
+                Button(action: {
+                    Task { await SupabaseAuthManager.shared.resendConfirmationEmail(email: confirmationEmail) }
+                }) {
+                    Text("重新发送")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(DS.Colors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Color.white.opacity(0.06))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
+                        )
+                }
+                .buttonStyle(.plain)
+                .pointerCursor()
+
+                Button(action: {
+                    awaitingEmailConfirmation = false
+                    confirmationEmail = ""
+                    isSignUpMode = false
+                }) {
+                    Text("返回登录")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(DS.Colors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Color.white.opacity(0.06))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
+                        )
+                }
+                .buttonStyle(.plain)
+                .pointerCursor()
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
+                .stroke(DS.Colors.accent.opacity(0.3), lineWidth: 0.5)
+        )
+    }
+
+    private func performAuthAction() {
+        guard !signInEmail.isEmpty, !signInPassword.isEmpty else { return }
+        isSigningIn = true
+        signInErrorMessage = nil
+        Task {
+            do {
+                if isSignUpMode {
+                    try await SupabaseAuthManager.shared.signUp(
+                        email: signInEmail,
+                        password: signInPassword
+                    )
+                } else {
+                    try await SupabaseAuthManager.shared.signIn(
+                        email: signInEmail,
+                        password: signInPassword
+                    )
+                }
+                signInPassword = "" // clear password from memory after success
+            } catch let supabaseError as SupabaseAuthError {
+                if case .emailConfirmationRequired(let email) = supabaseError {
+                    // Switch to the confirmation-pending view instead of showing an error.
+                    confirmationEmail = email
+                    awaitingEmailConfirmation = true
+                    signInPassword = ""
+                } else {
+                    signInErrorMessage = supabaseError.localizedDescription
+                }
+            } catch {
+                signInErrorMessage = error.localizedDescription
+            }
+            isSigningIn = false
+        }
     }
 
     // MARK: - Footer

@@ -83,12 +83,14 @@ struct APIPreset {
 }
 
 enum STTProvider: String, CaseIterable {
+    case whisperKit = "whisperkit"
     case assemblyAI = "assemblyai"
     case openAI = "openai"
     case apple = "apple"
 
     var displayName: String {
         switch self {
+        case .whisperKit: return "WhisperKit (On-Device)"
         case .assemblyAI: return "AssemblyAI"
         case .openAI: return "OpenAI"
         case .apple: return "Apple Speech"
@@ -104,13 +106,13 @@ final class APIConfiguration: ObservableObject {
 
     // MARK: - Default Values
 
-    private static let defaultWorkerBaseURL = "https://your-worker-name.your-subdomain.workers.dev"
-    private static let defaultChatFormat = ChatAPIFormat.anthropic
-    private static let defaultChatModel = "claude-sonnet-4-6"
-    private static let defaultTTSProvider = TTSProvider.elevenLabs
-    private static let defaultTTSModel = "eleven_flash_v2_5"
-    private static let defaultTTSVoiceID = ""
-    private static let defaultSTTProvider = STTProvider.assemblyAI
+    private static let defaultWorkerBaseURL = "https://clicky-proxy.zhaiwenshe.workers.dev"
+    private static let defaultChatFormat = ChatAPIFormat.openaiCompatible
+    private static let defaultChatModel = "Qwen/Qwen3.5-397B-A17B"
+    private static let defaultTTSProvider = TTSProvider.openaiCompatible
+    private static let defaultTTSModel = "FunAudioLLM/CosyVoice2-0.5B"
+    private static let defaultTTSVoiceID = "FunAudioLLM/CosyVoice2-0.5B:alex"
+    private static let defaultSTTProvider = STTProvider.whisperKit
     private static let defaultElementDetectionURL = "https://api.anthropic.com/v1/messages"
     private static let defaultElementDetectionModel = "claude-sonnet-4-6"
 
@@ -141,6 +143,13 @@ final class APIConfiguration: ObservableObject {
                 keychainWrite(key: "apiConfig.chat.apiKey", value: newValue)
             }
         }
+    }
+
+    /// The effective chat API format, accounting for mode.
+    /// Proxy mode always uses OpenAI-compatible format because the Worker
+    /// accepts that format and forwards to SiliconFlow's OpenAI-compatible API.
+    var effectiveChatAPIFormat: ChatAPIFormat {
+        chatAPIMode == .proxy ? .openaiCompatible : chatAPIFormat
     }
 
     /// Returns the resolved chat endpoint URL based on the current mode.

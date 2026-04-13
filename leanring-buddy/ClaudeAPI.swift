@@ -38,7 +38,7 @@ class ClaudeAPI {
         warmUpTLSConnectionIfNeeded()
     }
 
-    private func makeAPIRequest() -> URLRequest {
+    private func makeAPIRequest(bearerToken: String? = nil) -> URLRequest {
         var request = URLRequest(url: apiURL)
         request.httpMethod = "POST"
         request.timeoutInterval = 120
@@ -48,6 +48,11 @@ class ClaudeAPI {
         if let apiKey, !apiKey.isEmpty {
             request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        }
+        // In proxy mode with Supabase Auth enabled, attach the user's JWT so the
+        // Worker can verify the request before forwarding it upstream.
+        if let bearerToken, !bearerToken.isEmpty {
+            request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
         }
         return request
     }
@@ -111,11 +116,14 @@ class ClaudeAPI {
         systemPrompt: String,
         conversationHistory: [(userPlaceholder: String, assistantResponse: String)] = [],
         userPrompt: String,
+        // Pass the Supabase JWT when using the proxy Worker with auth enabled.
+        // Callers in direct mode leave this nil.
+        bearerToken: String? = nil,
         onTextChunk: @MainActor @Sendable (String) -> Void
     ) async throws -> (text: String, duration: TimeInterval) {
         let startTime = Date()
 
-        var request = makeAPIRequest()
+        var request = makeAPIRequest(bearerToken: bearerToken)
 
         // Build messages array
         var messages: [[String: Any]] = []
@@ -224,11 +232,14 @@ class ClaudeAPI {
         images: [(data: Data, label: String)],
         systemPrompt: String,
         conversationHistory: [(userPlaceholder: String, assistantResponse: String)] = [],
-        userPrompt: String
+        userPrompt: String,
+        // Pass the Supabase JWT when using the proxy Worker with auth enabled.
+        // Callers in direct mode leave this nil.
+        bearerToken: String? = nil
     ) async throws -> (text: String, duration: TimeInterval) {
         let startTime = Date()
 
-        var request = makeAPIRequest()
+        var request = makeAPIRequest(bearerToken: bearerToken)
 
         var messages: [[String: Any]] = []
         for (userPlaceholder, assistantResponse) in conversationHistory {

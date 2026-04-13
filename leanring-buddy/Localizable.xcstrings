@@ -4,6 +4,9 @@
     "" : {
 
     },
+    "%lld%%" : {
+
+    },
     "A side project I made for fun to help me learn stuff as I use my computer." : {
       "localizations" : {
         "zh-Hans" : {
@@ -44,6 +47,17 @@
         }
       }
     },
+    "API Key" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 密钥"
+          }
+        }
+      }
+    },
     "API Settings" : {
 
     },
@@ -67,6 +81,17 @@
         }
       }
     },
+    "Base URL" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接口地址"
+          }
+        }
+      }
+    },
     "Bugs, ideas, anything — I read every message." : {
       "localizations" : {
         "zh-Hans" : {
@@ -76,6 +101,19 @@
           }
         }
       }
+    },
+    "can't talk? click the menu bar icon and type your question instead." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不方便说话？点菜单栏图标，在输入框打字提问也行。"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+
     },
     "click this!" : {
       "localizations" : {
@@ -153,7 +191,20 @@
     "Direct" : {
 
     },
+    "Download" : {
+
+    },
+    "Download failed: %@" : {
+
+    },
+    "Download Model" : {
+
+    },
+    "Downloading…" : {
+
+    },
     "Drop your email to get started." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -174,6 +225,7 @@
       }
     },
     "Enter your email" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -229,6 +281,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修复命令"
+          }
+        }
+      }
+    },
+    "Format" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "格式"
           }
         }
       }
@@ -303,12 +365,32 @@
         }
       }
     },
+    "hey! i'm clicky, your screen assistant. grant the permissions above to get started." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "嘿！我是 clicky，你的屏幕助手。先在上方授权几个权限吧。"
+          }
+        }
+      }
+    },
     "Hi, I'm Farza. This is Clicky." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "嗨，我是 Farza。这是 Clicky。"
+          }
+        }
+      }
+    },
+    "hold control+option to talk to me! release when you're done." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住 control+option 跟我说话！说完松开就好。"
           }
         }
       }
@@ -334,6 +416,7 @@
       }
     },
     "If I keep building this, I'll keep you in the loop." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -386,6 +469,19 @@
         }
       }
     },
+    "Model ready — on-device transcription active" : {
+
+    },
+    "Model: %@  ·  %@, one-time download" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Model: %1$@  ·  %2$@, one-time download"
+          }
+        }
+      }
+    },
     "Nothing runs in the background. Clicky will only take a screenshot when you press the hot key. So, you can give that permission in peace. If you are still sus, eh, I can't do much there champ." : {
       "localizations" : {
         "zh-Hans" : {
@@ -395,6 +491,9 @@
           }
         }
       }
+    },
+    "On-Device Voice Model" : {
+
     },
     "Only takes a screenshot when you use the hotkey" : {
       "localizations" : {
@@ -447,6 +546,7 @@
       }
     },
     "press control + option and introduce yourself" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -514,6 +614,12 @@
           }
         }
       }
+    },
+    "Retry" : {
+
+    },
+    "Retry Download" : {
+
     },
     "Review code" : {
       "localizations" : {
@@ -616,6 +722,7 @@
       }
     },
     "Submit" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -655,7 +762,32 @@
         }
       }
     },
+    "try cmd+shift+space to open a quick panel right at your cursor!" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "试试 cmd+shift+space，在光标旁打开快捷面板！"
+          }
+        }
+      }
+    },
+    "Voice Engine" : {
+
+    },
+    "Voice ID" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音色 ID"
+          }
+        }
+      }
+    },
     "Watch Onboarding Again" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -675,75 +807,38 @@
         }
       }
     },
-    "hey! i'm clicky, your screen assistant. grant the permissions above to get started." : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "嘿！我是 clicky，你的屏幕助手。先在上方授权几个权限吧。" } }
-      }
+    "去注册" : {
+
     },
-    "hold control+option to talk to me! release when you're done." : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按住 control+option 跟我说话！说完松开就好。" } }
-      }
+    "去登录" : {
+
     },
-    "can't talk? click the menu bar icon and type your question instead." : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不方便说话？点菜单栏图标，在输入框打字提问也行。" } }
-      }
+    "密码" : {
+
     },
-    "try cmd+shift+space to open a quick panel right at your cursor!" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "试试 cmd+shift+space，在光标旁打开快捷面板！" } }
-      }
+    "已有账号？" : {
+
     },
-    "API Settings" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "API 设置" } }
-      }
+    "没有账号？" : {
+
     },
-    "Reset to Defaults" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "恢复默认" } }
-      }
+    "注册" : {
+
     },
-    "Mode" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "模式" } }
-      }
+    "注册中…" : {
+
     },
-    "Proxy" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "代理" } }
-      }
+    "登录" : {
+
     },
-    "Direct" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "直连" } }
-      }
+    "登录中…" : {
+
     },
-    "Format" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "格式" } }
-      }
+    "退出" : {
+
     },
-    "Provider" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "供应商" } }
-      }
-    },
-    "Base URL" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "接口地址" } }
-      }
-    },
-    "API Key" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "API 密钥" } }
-      }
-    },
-    "Voice ID" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "音色 ID" } }
-      }
+    "邮箱" : {
+
     }
   },
   "version" : "1.0"

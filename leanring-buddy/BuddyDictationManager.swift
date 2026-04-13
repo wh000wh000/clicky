@@ -262,7 +262,7 @@ final class BuddyDictationManager: NSObject, ObservableObject {
         return AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined
     }
 
-    private let transcriptionProvider: any BuddyTranscriptionProvider
+    private var transcriptionProvider: any BuddyTranscriptionProvider
     private let audioEngine = AVAudioEngine()
     private var activeTranscriptionSession: (any BuddyStreamingTranscriptionSession)?
     private var activeStartSource: BuddyDictationStartSource?
@@ -285,6 +285,17 @@ final class BuddyDictationManager: NSObject, ObservableObject {
         self.transcriptionProvider = transcriptionProvider
         self.transcriptionProviderDisplayName = transcriptionProvider.displayName
         super.init()
+    }
+
+    /// Reloads the transcription provider from the current APIConfiguration.
+    /// Called when the user changes STT settings or when WhisperKit finishes
+    /// downloading its model. Safe to call at any time — no-ops if a dictation
+    /// session is already in progress.
+    func reloadTranscriptionProvider() {
+        guard activeTranscriptionSession == nil else { return }
+        let newProvider = BuddyTranscriptionProviderFactory.makeDefaultProvider()
+        transcriptionProvider = newProvider
+        transcriptionProviderDisplayName = newProvider.displayName
     }
 
     func updateContextualKeyterms(_ contextualKeyterms: [String]) {

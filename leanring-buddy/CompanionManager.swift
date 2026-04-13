@@ -75,7 +75,7 @@ final class CompanionManager: ObservableObject {
     private lazy var openAICompatibleChatAPI: OpenAICompatibleChatAPI = {
         let config = APIConfiguration.shared
         return OpenAICompatibleChatAPI(
-            baseURL: config.chatAPIBaseURL,
+            baseURL: config.resolvedChatURL,
             model: selectedModel,
             apiKey: config.chatAPIKey
         )
@@ -93,7 +93,7 @@ final class CompanionManager: ObservableObject {
     private lazy var openAICompatibleTTSClient: OpenAICompatibleTTSClient = {
         let config = APIConfiguration.shared
         return OpenAICompatibleTTSClient(
-            baseURL: config.ttsAPIBaseURL,
+            baseURL: config.resolvedTTSURL,
             apiKey: config.ttsAPIKey,
             model: config.ttsAPIModel,
             voice: config.ttsAPIVoiceID.isEmpty ? "alloy" : config.ttsAPIVoiceID
@@ -112,6 +112,7 @@ final class CompanionManager: ObservableObject {
     private var textInputShortcutCancellable: AnyCancellable?
     private var voiceStateCancellable: AnyCancellable?
     private var audioPowerCancellable: AnyCancellable?
+    private var whisperKitModelStateCancellable: AnyCancellable?
     private var accessibilityCheckTimer: Timer?
     private var pendingKeyboardShortcutStartTask: Task<Void, Never>?
     /// Scheduled hide for transient cursor mode — cancelled if the user
@@ -212,6 +213,7 @@ final class CompanionManager: ObservableObject {
         startPermissionPolling()
         bindVoiceStateObservation()
         bindAudioPowerLevel()
+        bindWhisperKitModelState()
         bindShortcutTransitions()
         bindTextInputShortcut()
         // Eagerly touch the Claude API so its TLS warmup handshake completes
@@ -279,7 +281,7 @@ final class CompanionManager: ObservableObject {
             apiKey: config.chatAPIMode == .direct ? config.chatAPIKey : nil
         )
         openAICompatibleChatAPI = OpenAICompatibleChatAPI(
-            baseURL: config.chatAPIBaseURL,
+            baseURL: config.resolvedChatURL,
             model: selectedModel,
             apiKey: config.chatAPIKey
         )
@@ -289,7 +291,7 @@ final class CompanionManager: ObservableObject {
             model: config.ttsAPIModel
         )
         openAICompatibleTTSClient = OpenAICompatibleTTSClient(
-            baseURL: config.ttsAPIBaseURL,
+            baseURL: config.resolvedTTSURL,
             apiKey: config.ttsAPIKey,
             model: config.ttsAPIModel,
             voice: config.ttsAPIVoiceID.isEmpty ? "alloy" : config.ttsAPIVoiceID
@@ -412,6 +414,32 @@ final class CompanionManager: ObservableObject {
                 self?.refreshAllPermissions()
             }
         }
+    }
+
+    // MARK: - WhisperKit Forwarding
+
+    /// Starts the WhisperKit model download. Forwarded to WhisperKitModelManager.
+    func startWhisperKitDownload() {
+        WhisperKitModelManager.shared.startDownload()
+    }
+
+    /// Cancels an in-progress WhisperKit model download.
+    func cancelWhisperKitDownload() {
+        WhisperKitModelManager.shared.cancelDownload()
+    }
+
+    private func bindWhisperKitModelState() {
+        whisperKitModelStateCancellable = WhisperKitModelManager.shared.$modelState
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] newState in
+                guard let self else { return }
+                // When the model finishes downloading, automatically upgrade
+                // the transcription provider so push-to-talk uses WhisperKit
+                // without requiring an app restart.
+                if case .ready = newState {
+                    buddyDictationManager.reloadTranscriptionProvider()
+                }
+            }
     }
 
     private func bindAudioPowerLevel() {
@@ -643,13 +671,16 @@ final class CompanionManager: ObservableObject {
 
                 // Use the appropriate chat API based on configured format
                 let fullResponseText: String
-                let chatAPIFormat = APIConfiguration.shared.chatAPIFormat
+                let chatAPIFormat = APIConfiguration.shared.effectiveChatAPIFormat
                 if chatAPIFormat == .openaiCompatible {
                     let (responseText, _) = try await openAICompatibleChatAPI.analyzeImageStreaming(
                         images: labeledImages,
                         systemPrompt: systemPromptWithContext,
                         conversationHistory: historyForAPI,
                         userPrompt: transcript,
+                        bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
+                            ? await SupabaseAuthManager.shared.validAccessToken()
+                            : nil,
                         onTextChunk: { _ in }
                     )
                     fullResponseText = responseText
@@ -659,6 +690,9 @@ final class CompanionManager: ObservableObject {
                         systemPrompt: systemPromptWithContext,
                         conversationHistory: historyForAPI,
                         userPrompt: transcript,
+                        bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
+                            ? SupabaseAuthManager.shared.currentSession?.accessToken
+                            : nil,
                         onTextChunk: { _ in }
                     )
                     fullResponseText = responseText
@@ -747,9 +781,19 @@ final class CompanionManager: ObservableObject {
                     do {
                         // Use the appropriate TTS provider
                         if APIConfiguration.shared.ttsProvider == .openaiCompatible {
-                            try await openAICompatibleTTSClient.speakText(spokenText)
+                            try await openAICompatibleTTSClient.speakText(
+                                spokenText,
+                                bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
+                                    ? await SupabaseAuthManager.shared.validAccessToken()
+                                    : nil
+                            )
                         } else {
-                            try await elevenLabsTTSClient.speakText(spokenText)
+                            try await elevenLabsTTSClient.speakText(
+                                spokenText,
+                                bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
+                                    ? SupabaseAuthManager.shared.currentSession?.accessToken
+                                    : nil
+                            )
                         }
                         // speakText returns after player.play() — audio is now playing
                         voiceState = .responding

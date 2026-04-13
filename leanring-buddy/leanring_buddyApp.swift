@@ -42,6 +42,12 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
         ClickyAnalytics.configure()
         ClickyAnalytics.trackAppOpened()
 
+        // Restore any persisted Supabase session from Keychain before the
+        // companion starts, so proxy-mode API calls are authenticated immediately.
+        Task {
+            await SupabaseAuthManager.shared.restoreSession()
+        }
+
         menuBarPanelManager = MenuBarPanelManager(companionManager: companionManager)
         companionManager.start()
         // Auto-open the panel if the user still needs to do something:

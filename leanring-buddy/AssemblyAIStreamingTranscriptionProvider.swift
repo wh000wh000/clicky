@@ -30,6 +30,11 @@ final class AssemblyAIStreamingTranscriptionProvider: BuddyTranscriptionProvider
     var isConfigured: Bool { true }
     var unavailableExplanation: String? { nil }
 
+    /// Supabase JWT to attach when calling the proxy Worker's /transcribe-token endpoint.
+    /// Set this from CompanionManager (which is @MainActor) before starting a session.
+    /// Leave nil when not using Supabase Auth (direct mode or unauthenticated).
+    var proxyBearerToken: String?
+
     /// Single long-lived URLSession shared across all streaming sessions.
     /// Creating and invalidating a URLSession per session corrupts the OS
     /// connection pool and causes "Socket is not connected" errors after
@@ -64,6 +69,10 @@ final class AssemblyAIStreamingTranscriptionProvider: BuddyTranscriptionProvider
     private func fetchTemporaryToken() async throws -> String {
         var request = URLRequest(url: URL(string: tokenProxyURL)!)
         request.httpMethod = "POST"
+        // In proxy mode with Supabase Auth enabled, attach the JWT for Worker verification.
+        if let bearerToken = proxyBearerToken, !bearerToken.isEmpty {
+            request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
+        }
 
         let (data, response) = try await URLSession.shared.data(for: request)
 

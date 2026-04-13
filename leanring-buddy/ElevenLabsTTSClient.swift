@@ -34,7 +34,10 @@ final class ElevenLabsTTSClient {
 
     /// Sends `text` to ElevenLabs TTS and plays the resulting audio.
     /// Throws on network or decoding errors. Cancellation-safe.
-    func speakText(_ text: String) async throws {
+    ///
+    /// - Parameter bearerToken: Supabase JWT to attach when using the proxy Worker
+    ///   with auth enabled. Pass nil in direct mode.
+    func speakText(_ text: String, bearerToken: String? = nil) async throws {
         var request = URLRequest(url: proxyURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -43,6 +46,10 @@ final class ElevenLabsTTSClient {
         // In proxy mode, the Worker adds it server-side.
         if let apiKey, !apiKey.isEmpty {
             request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
+        }
+        // In proxy mode with Supabase Auth enabled, attach the JWT for Worker verification.
+        if let bearerToken, !bearerToken.isEmpty {
+            request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
         }
 
         let body: [String: Any] = [

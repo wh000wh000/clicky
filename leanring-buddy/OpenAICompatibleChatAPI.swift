@@ -54,6 +54,10 @@ class OpenAICompatibleChatAPI {
         systemPrompt: String,
         conversationHistory: [(userPlaceholder: String, assistantResponse: String)] = [],
         userPrompt: String,
+        // Pass the Supabase JWT when using the proxy Worker with auth enabled.
+        // In proxy mode the Worker verifies the JWT and adds the real API key
+        // server-side, so the bearer token replaces the API key in the header.
+        bearerToken: String? = nil,
         onTextChunk: @MainActor @Sendable (String) -> Void
     ) async throws -> (text: String, duration: TimeInterval) {
         let startTime = Date()
@@ -62,7 +66,11 @@ class OpenAICompatibleChatAPI {
         request.httpMethod = "POST"
         request.timeoutInterval = 120
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if let bearerToken, !bearerToken.isEmpty {
+            request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
 
         // Build messages array
         var messages: [[String: Any]] = []
