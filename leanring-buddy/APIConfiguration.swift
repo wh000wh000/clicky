@@ -153,12 +153,15 @@ final class APIConfiguration: ObservableObject {
     }
 
     /// Returns the resolved chat endpoint URL based on the current mode.
-    /// In proxy mode, appends "/chat" to the Worker base URL.
-    /// In direct mode, returns the base URL as-is (user provides full endpoint).
+    /// In proxy mode, appends "/chat/completions" — the Worker accepts this
+    /// path and forwards to SiliconFlow. The suffix also prevents
+    /// OpenAICompatibleChatAPI from double-appending "/chat/completions".
+    /// In direct mode, returns the base URL as-is (the API client appends
+    /// the standard OpenAI path automatically).
     var resolvedChatURL: String {
         switch chatAPIMode {
         case .proxy:
-            return chatAPIBaseURL + "/chat"
+            return chatAPIBaseURL + "/chat/completions"
         case .direct:
             return chatAPIBaseURL
         }
@@ -193,10 +196,12 @@ final class APIConfiguration: ObservableObject {
         }
     }
 
-    /// Resolved TTS endpoint. In proxy mode, appends "/tts" to the Worker URL.
+    /// Resolved TTS endpoint. In proxy mode, appends "/audio/speech" — the
+    /// Worker accepts this path and forwards to SiliconFlow. The suffix also
+    /// prevents OpenAICompatibleTTSClient from double-appending.
     var resolvedTTSURL: String {
         if chatAPIMode == .proxy && ttsAPIBaseURL == chatAPIBaseURL {
-            return ttsAPIBaseURL + "/tts"
+            return ttsAPIBaseURL + "/audio/speech"
         }
         return ttsAPIBaseURL
     }

@@ -5,8 +5,8 @@
  * API keys. All secrets are stored as Cloudflare secrets.
  *
  * Routes:
- *   POST /chat                    → SiliconFlow /chat/completions (streaming)
- *   POST /tts                     → SiliconFlow /audio/speech
+ *   POST /chat (or /chat/completions) → SiliconFlow /chat/completions (streaming)
+ *   POST /tts (or /audio/speech)   → SiliconFlow /audio/speech
  *   GET  /quota                   → Returns current user quota status (auth required)
  *   POST /create-checkout-session → Creates a Stripe Checkout Session (auth required)
  *   POST /create-portal-session  → Creates a Stripe Billing Portal session (auth required)
@@ -118,11 +118,11 @@ export default {
     }
 
     try {
-      if (request.method === "POST" && url.pathname === "/chat") {
+      if (request.method === "POST" && (url.pathname === "/chat" || url.pathname === "/chat/completions")) {
         return await handleChat(request, env, ctx, authenticatedUserId);
       }
 
-      if (request.method === "POST" && url.pathname === "/tts") {
+      if (request.method === "POST" && (url.pathname === "/tts" || url.pathname === "/audio/speech")) {
         return await handleTTS(request, env);
       }
 
