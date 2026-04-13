@@ -204,10 +204,10 @@ private struct CompanionResponseOverlayView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: DS.CornerRadius.large, style: .continuous)
                         .fill(DS.Colors.surface1.opacity(0.95))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            RoundedRectangle(cornerRadius: DS.CornerRadius.large, style: .continuous)
                                 .stroke(DS.Colors.borderSubtle.opacity(0.5), lineWidth: 0.8)
                         )
                         .shadow(color: Color.black.opacity(0.35), radius: 16, x: 0, y: 8)

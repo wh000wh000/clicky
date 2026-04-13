@@ -62,7 +62,7 @@ struct APISettingsView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(DS.Colors.textTertiary)
                     .frame(width: 20, height: 20)
-                    .background(Circle().fill(Color.white.opacity(0.08)))
+                    .background(Circle().fill(DS.Colors.surface2))
             }
             .buttonStyle(.plain)
             .pointerCursor()
@@ -88,7 +88,7 @@ struct APISettingsView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(
-                                Capsule().fill(Color.white.opacity(0.06))
+                                Capsule().fill(DS.Colors.surface1)
                             )
                             .overlay(
                                 Capsule().stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
@@ -265,7 +265,7 @@ struct APISettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Download failed: \(message)")
                         .font(.system(size: 10))
-                        .foregroundColor(.red.opacity(0.8))
+                        .foregroundColor(DS.Colors.destructiveText)
                         .fixedSize(horizontal: false, vertical: true)
                     Button(action: { WhisperKitModelManager.shared.startDownload() }) {
                         Text("Retry Download")
@@ -275,7 +275,7 @@ struct APISettingsView: View {
                             .padding(.vertical, 6)
                             .background(
                                 RoundedRectangle(cornerRadius: DS.CornerRadius.small, style: .continuous)
-                                    .fill(Color.white.opacity(0.06))
+                                    .fill(DS.Colors.surface1)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: DS.CornerRadius.small, style: .continuous)
@@ -322,7 +322,7 @@ struct APISettingsView: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
+                    .fill(DS.Colors.surface1)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
@@ -357,7 +357,7 @@ struct APISettingsView: View {
                 .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: DS.CornerRadius.small, style: .continuous)
-                        .fill(Color.white.opacity(0.06))
+                        .fill(DS.Colors.surface1)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: DS.CornerRadius.small, style: .continuous)
@@ -380,7 +380,7 @@ struct APISettingsView: View {
                 .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: DS.CornerRadius.small, style: .continuous)
-                        .fill(Color.white.opacity(0.06))
+                        .fill(DS.Colors.surface1)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: DS.CornerRadius.small, style: .continuous)

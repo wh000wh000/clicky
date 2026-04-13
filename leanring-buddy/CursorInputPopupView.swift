@@ -56,7 +56,7 @@ struct CursorInputPopupView: View {
                         .padding(.vertical, 6)
                         .background(
                             Capsule()
-                                .fill(Color.white.opacity(0.06))
+                                .fill(DS.Colors.surface1)
                         )
                         .overlay(
                             Capsule()
@@ -83,7 +83,7 @@ struct CursorInputPopupView: View {
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(DS.Colors.surface2)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
