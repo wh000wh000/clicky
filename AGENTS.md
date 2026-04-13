@@ -74,7 +74,11 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 | `ClickyAnalytics.swift` | ~121 | PostHog analytics integration for usage tracking. |
 | `WindowPositionManager.swift` | ~262 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
 | `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader for keys stored in the app bundle Info.plist. |
-| `worker/src/index.ts` | ~142 | Cloudflare Worker proxy. Three routes: `/chat` (Claude), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). |
+| `worker/src/index.ts` | ~800 | Cloudflare Worker proxy. Routes: `/chat`, `/tts`, `/quota`, `/create-wechat-order`, `/check-payment-status`, `/wechat-notify`. JWT auth (Supabase ES256), daily quota enforcement, WeChat Pay Native order creation/polling/webhook. Stripe routes commented out (code preserved). |
+| `leanring-buddy/SupabaseAuthManager.swift` | ~350 | Supabase auth manager. Handles sign-up/in/out, JWT session persistence, email confirmation flow, invitation code redemption, and `UserProfile` fetch (plan, quota counts, invite code). |
+| `leanring-buddy/WeChatPayClient.swift` | ~150 | WeChat Pay network client. `createOrder(plan:)` calls Worker `/create-wechat-order` and returns `WeChatPayOrder` (codeURL, outTradeNo, plan, amountFen). `checkPaymentStatus(outTradeNo:)` polls `/check-payment-status`. |
+| `leanring-buddy/StripeCheckoutClient.swift` | ~110 | Stripe checkout client (preserved but unused — Worker routes commented out). `createCheckoutSession(plan:)` and `createPortalSession()` kept for future re-enablement. |
+| `leanring-buddy/UserCenterView.swift` | ~380 | Account center view (Phase 5). Inline panel swap from the account icon. Shows plan badge, daily/total usage, invite code. Free users see WeChat Pay QR code flow (CoreImage QR generation, 3-second polling, success state). Paid users see plan info. |
 
 ## Build & Run
 
