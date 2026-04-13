@@ -1,7 +1,7 @@
 # Clicky 商业化路线图
 
-> 最后更新：2026-04-12
-> 状态：Phase 1 进行中 — Auth 代码已写，Worker 改造待执行
+> 最后更新：2026-04-13
+> 状态：Phase 1 已完成 — Auth + Worker 改造已上线，等待 Xcode 端到端验证
 
 ---
 
@@ -22,8 +22,8 @@
 |------|------|------|
 | Phase 0: 数据库 Schema | ✅ 已完成 | Supabase 表结构、RLS、触发器、函数 |
 | Phase 0.5: SiliconFlow 模型替换 | ✅ 已完成 | 客户端可配置 API 层 + Qwen 3.5 Preset |
-| Phase 1a: Supabase Auth 集成 | 🔧 代码已写 | Swift 端认证 + Worker JWT 验证（未部署） |
-| Phase 1b: Worker 改造为 SiliconFlow 代理 | ⬜ 未开始 | 从 Anthropic/ElevenLabs/AssemblyAI 迁移 |
+| Phase 1a: Supabase Auth 集成 | ✅ 已完成 | Swift 端认证 + Worker JWT 验证 + 邮件确认流程 |
+| Phase 1b: Worker 改造为 SiliconFlow 代理 | ✅ 已完成 | 提交 `fa70d6a`，已部署，国际站 api.siliconflow.com |
 | Phase 2: 邀请码准入 | ⬜ 未开始 | 注册后邀请码验证门槛 |
 | Phase 3: 用量计量与限额 | ⬜ 未开始 | API 调用计数 + 每日限额 |
 | Phase 4: 套餐与支付 | ⬜ 未开始 | RevenueCat / Apple IAP |
@@ -66,87 +66,71 @@ Schema 文件：`scripts/schema.sql`
 
 ---
 
-## Phase 1a: Supabase Auth 集成 🔧
+## Phase 1a: Supabase Auth 集成 ✅
 
-> 代码已写入本地工作区，尚未提交/部署
+**已完成** — 提交 `fa70d6a`
 
-### 已完成的代码
+### 已完成的内容
 
-| 文件 | 状态 | 说明 |
-|------|------|------|
-| `SupabaseAuthManager.swift` | ✅ 新文件 | 邮箱/密码认证，Keychain 持久化，token 刷新 |
-| `worker/src/index.ts` | ✅ 已修改 | JWKS/ES256 JWT 验证逻辑 |
-| `ClaudeAPI.swift` | ✅ 已修改 | `bearerToken` 参数支持 |
-| `ElevenLabsTTSClient.swift` | ✅ 已修改 | `bearerToken` 参数支持 |
-| `AssemblyAIStreamingTranscriptionProvider.swift` | ✅ 已修改 | `proxyBearerToken` 属性 |
-| `CompanionManager.swift` | ✅ 已修改 | proxy 模式下传递 JWT |
-| `CompanionPanelView.swift` | ✅ 已修改 | 登录/注册 UI（邮箱+密码） |
-| `Info.plist` | ✅ 已修改 | `SupabaseProjectURL` + `SupabaseAnonKey` |
-| `leanring_buddyApp.swift` | ✅ 已修改 | 启动时 `restoreSession()` |
-
-### 待完成
-
-- [ ] Worker 部署（`npx wrangler deploy`）— 需要先完成 Phase 1b（Worker 改造）
-- [ ] Supabase Dashboard 创建测试用户
-- [ ] Xcode 编译测试 + 端到端登录流程验证
-- [ ] Bearer token 传递改为走 `OpenAICompatibleChatAPI`（当前代码传给 `ClaudeAPI`，需对齐）
+| 文件 | 说明 |
+|------|------|
+| `SupabaseAuthManager.swift` | 邮箱/密码认证，Keychain 持久化，token 自动刷新，邮件确认流程，resend 支持 |
+| `worker/src/index.ts` | JWKS/ES256 JWT 验证（Supabase P-256 签名） |
+| `OpenAICompatibleChatAPI.swift` | `bearerToken` 参数，proxy 模式传递 Supabase JWT |
+| `OpenAICompatibleTTSClient.swift` | `bearerToken` 参数支持 |
+| `CompanionManager.swift` | proxy 模式下从 SupabaseAuthManager 获取 JWT 并传递 |
+| `CompanionPanelView.swift` | 三态 auth UI（已登录 / 等待邮件确认 / 表单），注册/登录视觉区分 |
+| `Info.plist` | `SupabaseProjectURL` + `SupabaseAnonKey` |
+| `leanring_buddyApp.swift` | 启动时 `restoreSession()` |
 
 ### 技术决策
 
-- **纯 URLSession 而非 supabase-swift SPM** — 避免 xcodeproj 修改，KISS 原则
-- **JWKS/ES256 验证** — Supabase 当前使用 ECC P-256 签名（非 HS256）
+- **纯 URLSession 而非 supabase-swift SPM** — 避免 xcodeproj 改动，KISS 原则
+- **JWKS/ES256 验证** — Supabase 使用 ECC P-256 签名（非 HS256）
 - **邮箱/密码而非 Apple Sign In** — 无付费 Apple Developer 账号
+- **emailConfirmationRequired 错误类型** — 注册成功但邮件确认开启时，UI 切换到等待确认视图而非显示错误
 
 ---
 
-## Phase 1b: Worker 改造为 SiliconFlow 代理 ⬜
+## Phase 1b: Worker 改造为 SiliconFlow 代理 ✅
 
-> 这是 Phase 1 中尚未执行的核心任务
+**已完成** — 提交 `fa70d6a`，已部署到 Cloudflare
 
-### 改造内容
+### 已完成路由
 
-| 路由 | 改造前 | 改造后 |
-|------|--------|--------|
-| `POST /chat` | 转发 `api.anthropic.com`（Anthropic 格式） | 转发 `api.siliconflow.cn/v1/chat/completions`（OpenAI 格式） |
-| `POST /tts` | 转发 `api.elevenlabs.io`（ElevenLabs 格式） | 转发 `api.siliconflow.cn/v1/audio/speech`（OpenAI 格式） |
-| `POST /transcribe-token` | 获取 AssemblyAI WebSocket token | **废弃** |
-| `POST /transcribe`（新） | — | 转发 `api.siliconflow.cn/v1/audio/transcriptions`（文件上传） |
-
-### Worker Secrets 变更
-
-| 变量 | 操作 | 说明 |
+| 路由 | 上游 | 说明 |
 |------|------|------|
-| `SILICONFLOW_API_KEY` | 新增 | SiliconFlow 统一 API Key |
-| `SUPABASE_URL` | 保留 | 已配置，JWT 验证用 |
-| `ANTHROPIC_API_KEY` | 删除 | 不再需要 |
-| `ELEVENLABS_API_KEY` | 删除 | 不再需要 |
-| `ASSEMBLYAI_API_KEY` | 删除 | 不再需要 |
+| `POST /chat` | `api.siliconflow.com/v1/chat/completions` | OpenAI 格式，SSE 流式，Qwen3.5-397B 默认 |
+| `POST /tts` | `api.siliconflow.com/v1/audio/speech` | OpenAI 格式，CosyVoice2-0.5B alex 声音 |
+| `POST /transcribe-token` | — | **已废弃**（WhisperKit 本地推理替代） |
 
-### Worker Env 变量（wrangler.toml [vars]）
+### Worker Secrets（已配置）
+
+| 变量 | 状态 |
+|------|------|
+| `SILICONFLOW_API_KEY` | ✅ 已设置 |
+| `SUPABASE_URL` | ✅ 已设置，JWT JWKS 验证用 |
+| `ANTHROPIC_API_KEY` | 已移除 |
+| `ELEVENLABS_API_KEY` | 已移除 |
+| `ASSEMBLYAI_API_KEY` | 已移除 |
+
+### wrangler.toml [vars]
 
 ```toml
-SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
-DEFAULT_CHAT_MODEL = "Qwen/Qwen3.5-122B-A10B"
+SILICONFLOW_BASE_URL = "https://api.siliconflow.com/v1"   # 国际站（国内站从 CF edge 超时）
+DEFAULT_CHAT_MODEL = "Qwen/Qwen3.5-397B-A17B"
 DEFAULT_TTS_MODEL = "FunAudioLLM/CosyVoice2-0.5B"
 DEFAULT_TTS_VOICE = "FunAudioLLM/CosyVoice2-0.5B:alex"
 ```
 
-### 客户端改造
+> ⚠️ **关键决策**：使用国际站 `api.siliconflow.com`，国内站 `api.siliconflow.cn` 从 Cloudflare Worker 边缘节点访问超时（exit code 28）。
 
-- **Proxy 模式 Chat**：`CompanionManager` 从 `ClaudeAPI` 切换到 `OpenAICompatibleChatAPI`
-- **Proxy 模式 TTS**：从 `ElevenLabsTTSClient` 切换到 `OpenAICompatibleTTSClient`
-- **Proxy 模式 STT**：从 AssemblyAI 实时流式切换到上传式转写
-  - 复用 `OpenAIAudioTranscriptionProvider` 的录音缓冲 + WAV 上传逻辑
-  - Worker 新增 `/transcribe` 路由转发到 SiliconFlow
-
-### 模型选择
-
-Chat 模型供用户体验选择：
+### 模型选项（供用户体验）
 
 | 模型 ID | 参数量 | 类型 | 适用场景 |
 |---------|--------|------|---------|
-| `Qwen/Qwen3.5-397B-A17B` | 397B (激活 17B) | MoE | 旗舰质量 |
-| `Qwen/Qwen3.5-122B-A10B` | 122B (激活 10B) | MoE | 默认推荐 |
+| `Qwen/Qwen3.5-397B-A17B` | 397B (激活 17B) | MoE | 旗舰质量（默认） |
+| `Qwen/Qwen3.5-122B-A10B` | 122B (激活 10B) | MoE | 均衡 |
 | `Qwen/Qwen3.5-35B-A3B` | 35B (激活 3B) | MoE | 轻量快速 |
 | `Qwen/Qwen3.5-27B` | 27B | Dense | 稳定可靠 |
 
@@ -263,17 +247,18 @@ Chat 模型供用户体验选择：
 
 | 依赖 | 用途 | 阶段 |
 |------|------|------|
-| SiliconFlow API | Chat + TTS + STT 统一平台 | Phase 1b |
-| Supabase (SG region) | Auth + Database | Phase 1a |
-| Cloudflare Worker | API 代理 + 鉴权 + 计量 | Phase 1 |
+| SiliconFlow API | Chat + TTS（国际站） | Phase 1b ✅ |
+| Supabase (SG region) | Auth + Database | Phase 1a ✅ |
+| Cloudflare Worker | API 代理 + 鉴权 + 计量 | Phase 1 ✅ |
+| WhisperKit (argmaxinc) | 本地 STT，Apple Neural Engine | Phase 1b ✅ |
 | RevenueCat SDK | Apple IAP 管理 | Phase 4 |
 | SwiftUI Charts | 用量图表 | Phase 5 |
 
 ## 风险与注意事项
 
 1. **API 成本控制**: 邀请码是第一道防线，限额是第二道。Phase 1-3 应尽快串联完成
-2. **STT 延迟**: SiliconFlow 仅支持上传式 STT，push-to-talk 体验会有 1-2 秒延迟（相比 AssemblyAI 实时流式）。可考虑 Apple Speech 作为免费套餐的本地 fallback
-3. **国内站 vs 海外站**: SiliconFlow 国内站模型更丰富（Qwen3.5 全系），Worker 默认代理到国内站
+2. **STT 方案**: ✅ 已选用 WhisperKit（本地 Apple Neural Engine，0.46s 延迟，2.2% WER），优于 AssemblyAI 实时流式。~800 MB 模型按需下载，Apple Speech 作为未下载时的免费 fallback
+3. **国内站 vs 海外站**: SiliconFlow 国内站（`api.siliconflow.cn`）从 Cloudflare Worker 访问超时，已改用国际站 `api.siliconflow.com`
 4. **Qwen 3.5 多模态**: Qwen 3.5 统一多模态架构，原生支持图像，无需单独 VL 模型
 5. **App Store 审核**: IAP 审核周期较长，Phase 4 需要提前准备商品配置
 6. **TCC 权限**: 不要从终端 `xcodebuild`，会导致屏幕录制/辅助功能权限失效
