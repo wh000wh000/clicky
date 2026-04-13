@@ -10,6 +10,17 @@
 
 import Foundation
 
+/// Thrown when the Clicky proxy Worker rejects a /chat request because the
+/// user's daily quota is exhausted. Carries the structured 429 response body
+/// so the UI can display the exact limit and current usage count.
+struct ChatQuotaExceededError: LocalizedError {
+    let message: String
+    let dailyLimit: Int
+    let usedToday: Int
+
+    var errorDescription: String? { message }
+}
+
 class OpenAICompatibleChatAPI {
     private let apiURL: URL
     var model: String
@@ -152,6 +163,23 @@ class OpenAICompatibleChatAPI {
             for try await line in bytes.lines {
                 errorBody += line
             }
+
+            // Parse the proxy Worker's structured 429 quota-exceeded body so the
+            // UI can show a meaningful message instead of a generic error string.
+            if httpResponse.statusCode == 429,
+               let data = errorBody.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               (json["error"] as? String) == "daily_limit_exceeded",
+               let message = json["message"] as? String {
+                let dailyLimit = json["daily_limit"] as? Int ?? 0
+                let usedToday  = json["used_today"]  as? Int ?? 0
+                throw ChatQuotaExceededError(
+                    message:    message,
+                    dailyLimit: dailyLimit,
+                    usedToday:  usedToday
+                )
+            }
+
             throw NSError(domain: "OpenAICompatibleChatAPI", code: httpResponse.statusCode,
                           userInfo: [NSLocalizedDescriptionKey: "API error (\(httpResponse.statusCode)): \(errorBody)"])
         }

@@ -106,7 +106,7 @@ final class APIConfiguration: ObservableObject {
 
     // MARK: - Default Values
 
-    private static let defaultWorkerBaseURL = "https://clicky-proxy.zhaiwenshe.workers.dev"
+    private static let defaultWorkerBaseURL = "https://api.lingyuan.ai"
     private static let defaultChatFormat = ChatAPIFormat.openaiCompatible
     private static let defaultChatModel = "Qwen/Qwen3.5-397B-A17B"
     private static let defaultTTSProvider = TTSProvider.openaiCompatible
