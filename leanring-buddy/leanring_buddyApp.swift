@@ -63,6 +63,19 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
         companionManager.stop()
     }
 
+    /// Handles deep links opened via the `clicky://` custom URL scheme.
+    /// Supabase email confirmation redirects to `clicky://auth/callback#access_token=...`
+    /// after the user clicks the link in their inbox. macOS routes that URL here,
+    /// whether the app was already running or just launched to handle the link.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard url.scheme == "clicky" else { continue }
+            Task {
+                await SupabaseAuthManager.shared.handleAuthCallback(url: url)
+            }
+        }
+    }
+
     /// Registers the app as a login item so it launches automatically on
     /// startup. Uses SMAppService which shows the app in System Settings >
     /// General > Login Items, letting the user toggle it off if they want.

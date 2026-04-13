@@ -222,6 +222,88 @@ final class SupabaseAuthManager: NSObject, ObservableObject {
         return currentSession?.accessToken
     }
 
+    // MARK: - Auth Callback (Deep Link)
+
+    /// Handles the Supabase email confirmation deep link opened via the custom
+    /// URL scheme: `clicky://auth/callback#access_token=...&refresh_token=...`
+    ///
+    /// Supabase encodes the session tokens in the URL **fragment** (after `#`),
+    /// not the query string, so we treat the fragment as a query string to parse
+    /// individual key-value pairs.
+    ///
+    /// Called by `CompanionAppDelegate.application(_:open:)` whenever macOS
+    /// hands the app a `clicky://` URL.
+    func handleAuthCallback(url: URL) async {
+        guard url.scheme == "clicky", url.host == "auth" else { return }
+
+        guard let fragment = url.fragment else {
+            print("⚠️ Auth callback: URL has no fragment")
+            return
+        }
+
+        // Treat the fragment as a query string so URLComponents can parse it.
+        var fragmentComponents = URLComponents()
+        fragmentComponents.query = fragment
+        guard let queryItems = fragmentComponents.queryItems else { return }
+
+        let params = Dictionary(
+            uniqueKeysWithValues: queryItems.compactMap { item -> (String, String)? in
+                guard let value = item.value else { return nil }
+                return (item.name, value)
+            }
+        )
+
+        // Surface errors (e.g. otp_expired) as console warnings — the app stays
+        // in the "awaiting confirmation" state and the user can request a resend.
+        if let errorCode = params["error"] {
+            let description = params["error_description"]?
+                .replacingOccurrences(of: "+", with: " ") ?? errorCode
+            print("⚠️ Auth callback error (\(errorCode)): \(description)")
+            return
+        }
+
+        guard
+            let accessToken  = params["access_token"],
+            let refreshToken = params["refresh_token"],
+            let expiresInString = params["expires_in"],
+            let expiresIn = Int(expiresInString)
+        else {
+            print("⚠️ Auth callback: missing required token fields in fragment")
+            return
+        }
+
+        let expiresAt = params["expires_at"].flatMap { Int($0) }
+
+        // Fetch full user details (id + email) using the new access token.
+        let user = await fetchUserDetails(accessToken: accessToken)
+            ?? SupabaseUser(id: "", email: nil)
+
+        let session = SupabaseSession(
+            accessToken:  accessToken,
+            refreshToken: refreshToken,
+            expiresIn:    expiresIn,
+            expiresAt:    expiresAt,
+            user:         user
+        )
+
+        persistSession(session)
+        currentSession = session
+        print("✅ Auth callback: session established for \(user.email ?? "unknown")")
+    }
+
+    /// Fetches the authenticated user's profile from Supabase using a valid access token.
+    private func fetchUserDetails(accessToken: String) async -> SupabaseUser? {
+        guard !supabaseProjectURL.isEmpty else { return nil }
+
+        let endpoint = URL(string: "\(supabaseProjectURL)/auth/v1/user")!
+        var request = URLRequest(url: endpoint)
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+
+        guard let (data, _) = try? await urlSession.data(for: request) else { return nil }
+        return try? JSONDecoder().decode(SupabaseUser.self, from: data)
+    }
+
     // MARK: - Private: Apple Sign In Flow
 
     private func performAppleSignInRequest() async throws -> ASAuthorizationAppleIDCredential {
