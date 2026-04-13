@@ -2,8 +2,38 @@ name = "clicky-proxy"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
+# 自定义域名（lingyuan.ai 托管在 Cloudflare，部署时自动创建 DNS 记录）
+[[routes]]
+pattern = "api.lingyuan.ai"
+custom_domain = true
+
 [vars]
 SILICONFLOW_BASE_URL = "https://api.siliconflow.com/v1"
 DEFAULT_CHAT_MODEL = "Qwen/Qwen3.5-397B-A17B"
 DEFAULT_TTS_MODEL = "FunAudioLLM/CosyVoice2-0.5B"
 DEFAULT_TTS_VOICE = "FunAudioLLM/CosyVoice2-0.5B:alex"
+
+# 微信支付套餐价格（单位：分，1 CNY = 100 分）
+WECHAT_PRO_PRICE_FEN     = "2900"   # Pro     → ¥29.00/月
+WECHAT_PREMIUM_PRICE_FEN = "9900"   # Premium → ¥99.00/月
+
+# Worker 公开域名，用于拼接微信支付回调 notify_url（部署后填入实际域名）
+WECHAT_NOTIFY_HOST = "https://api.lingyuan.ai"
+
+# Secrets (set via `npx wrangler secret put <NAME>` — never commit values):
+#   SILICONFLOW_API_KEY       — SiliconFlow unified API key
+#   SUPABASE_URL              — Supabase project URL (for JWT verification)
+#   SUPABASE_SERVICE_ROLE_KEY — Supabase service role key (for quota writes, bypasses RLS)
+#
+# 微信支付 secrets（set via `npx wrangler secret put <NAME>`）:
+#   WECHAT_MCH_ID       — 商户号（mchid）
+#   WECHAT_APP_ID       — AppID（公众号 / APP 申请时绑定的 appid）
+#   WECHAT_API_V3_KEY   — APIv3 密钥（32 位字符串，商户平台「API 安全」处设置）
+#   WECHAT_PRIVATE_KEY  — 商户 API 证书私钥完整 PEM 内容（apiclient_key.pem，PKCS8 格式）
+#                         注：若私钥以 "-----BEGIN RSA PRIVATE KEY-----" 开头（PKCS1 格式），
+#                         需先转换：openssl pkcs8 -topk8 -nocrypt -in apiclient_key.pem -out apiclient_key_pkcs8.pem
+#   WECHAT_SERIAL_NO    — 商户 API 证书序列号（商户平台「API 安全」→「证书管理」查看）
+#
+# Stripe secrets（路由暂时注释掉，代码保留备用）:
+#   STRIPE_SECRET_KEY         — sk_live_... 或 sk_test_...
+#   STRIPE_WEBHOOK_SECRET     — whsec_... (Dashboard Webhook endpoint secret)
