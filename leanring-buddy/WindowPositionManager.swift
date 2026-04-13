@@ -49,11 +49,15 @@ class WindowPositionManager {
         switch presentationDestination {
         case .alreadyGranted:
             return .alreadyGranted
-        case .systemPrompt:
+        case .systemPrompt, .systemSettings:
             hasAttemptedAccessibilitySystemPromptDuringCurrentLaunch = true
+            // Always call AXIsProcessTrustedWithOptions to (re-)register the current
+            // build in the TCC database. Xcode debug builds get a new ad-hoc code
+            // signature on every compile, which invalidates the previous TCC entry.
+            // On macOS 15 Sequoia this call is completely silent (no visible dialog),
+            // so calling it on every tap has no UX downside.
             let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
             _ = AXIsProcessTrustedWithOptions(options)
-        case .systemSettings:
             openAccessibilitySettings()
         }
 
@@ -119,11 +123,22 @@ class WindowPositionManager {
         switch presentationDestination {
         case .alreadyGranted:
             return .alreadyGranted
-        case .systemPrompt:
+        case .systemPrompt, .systemSettings:
             hasAttemptedScreenRecordingSystemPromptDuringCurrentLaunch = true
-            _ = CGRequestScreenCaptureAccess()
-        case .systemSettings:
-            openScreenRecordingSettings()
+            // Always call CGRequestScreenCaptureAccess() to (re-)register the current
+            // build in the TCC database. Xcode debug builds get a new ad-hoc code
+            // signature on every compile, which invalidates the previous TCC entry.
+            // Returns true synchronously if already authorized (no dialog shown).
+            // Returns false if not authorized (may show a one-time system dialog).
+            let isAlreadyAuthorized = CGRequestScreenCaptureAccess()
+            if isAlreadyAuthorized {
+                UserDefaults.standard.set(true, forKey: hasPreviouslyConfirmedScreenRecordingPermissionUserDefaultsKey)
+            } else {
+                // Not yet authorized — open System Settings so the user can toggle
+                // the switch. CGRequestScreenCaptureAccess() may have shown a dialog
+                // on the very first call; on subsequent calls it's silent.
+                openScreenRecordingSettings()
+            }
         }
 
         return presentationDestination

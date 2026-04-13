@@ -31,6 +31,9 @@ struct QuickActionPreset: Identifiable {
 @MainActor
 final class CompanionManager: ObservableObject {
     @Published private(set) var voiceState: CompanionVoiceState = .idle
+    /// True after the proxy Worker returns 429 daily_limit_exceeded.
+    /// Cleared automatically when the user starts the next interaction.
+    @Published private(set) var isQuotaExceeded: Bool = false
     @Published private(set) var lastTranscript: String?
     @Published private(set) var currentAudioPowerLevel: CGFloat = 0
     @Published private(set) var hasAccessibilityPermission = false
@@ -313,7 +316,11 @@ final class CompanionManager: ObservableObject {
             globalPushToTalkShortcutMonitor.stop()
         }
 
-        hasScreenRecordingPermission = WindowPositionManager.hasScreenRecordingPermission()
+        // Use the session-launch check instead of the raw API call:
+        // CGPreflightScreenCaptureAccess() returns false-negatives on macOS 15 Sequoia
+        // even when the user has already granted permission. The fallback reads the
+        // UserDefaults flag that was persisted the last time the API returned true.
+        hasScreenRecordingPermission = WindowPositionManager.shouldTreatScreenRecordingPermissionAsGrantedForSessionLaunch()
 
         let micAuthStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         hasMicrophonePermission = micAuthStatus == .authorized
@@ -344,6 +351,16 @@ final class CompanionManager: ObservableObject {
         if !previouslyHadAll && allPermissionsGranted {
             ClickyAnalytics.trackAllPermissionsGranted()
             onboardingGuideManager.notifyEvent(.allPermissionsGranted)
+
+            // If the user already completed onboarding and cursor is enabled, show the
+            // overlay immediately now that all four permissions are satisfied. Without
+            // this, a returning user who re-granted permissions (e.g., after a new build
+            // invalidated TCC) would need to restart the app to see the cursor.
+            if hasCompletedOnboarding && isClickyCursorEnabled && !isOverlayVisible {
+                overlayWindowManager.hasShownOverlayBefore = true
+                overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
+                isOverlayVisible = true
+            }
         }
     }
 
@@ -387,7 +404,14 @@ final class CompanionManager: ObservableObject {
                 }
             } catch {
                 print("⚠️ Screen content permission request failed: \(error)")
-                await MainActor.run { isRequestingScreenContent = false }
+                // ScreenCaptureKit throws when the underlying screen recording TCC
+                // permission isn't granted for this app build. Automatically request
+                // screen recording permission so the user can unblock the flow without
+                // knowing which permission gate to fix first.
+                await MainActor.run {
+                    isRequestingScreenContent = false
+                    WindowPositionManager.requestScreenRecordingPermission()
+                }
             }
         }
     }
@@ -644,6 +668,7 @@ final class CompanionManager: ObservableObject {
         currentResponseTask = Task {
             // Stay in processing (spinner) state — no streaming text displayed
             voiceState = .processing
+            isQuotaExceeded = false  // Clear any previous quota-exceeded banner
 
             do {
                 // Capture the user's current scene (frontmost app + window title)
@@ -699,6 +724,13 @@ final class CompanionManager: ObservableObject {
                 }
 
                 guard !Task.isCancelled else { return }
+
+                // Refresh userProfile in the background so the panel usage
+                // counter reflects the incremented daily_chat_count from the DB.
+                // Fire-and-forget — does not block the response/TTS pipeline.
+                if APIConfiguration.shared.chatAPIMode == .proxy {
+                    Task { await SupabaseAuthManager.shared.fetchUserProfile() }
+                }
 
                 // Parse the [POINT:...] tag from Claude's response
                 let parseResult = Self.parsePointingCoordinates(from: fullResponseText)
@@ -805,6 +837,16 @@ final class CompanionManager: ObservableObject {
                 }
             } catch is CancellationError {
                 // User spoke again — response was interrupted
+            } catch let quotaError as ChatQuotaExceededError {
+                // 429 daily_limit_exceeded: show a panel banner instead of
+                // speaking the credits-error fallback, since the user is not
+                // "out of credits" — they just need to wait until tomorrow.
+                isQuotaExceeded = true
+                voiceState = .idle
+                print("⚠️ Quota exceeded: \(quotaError.message)")
+                // Refresh profile so the usage counter in the panel reflects
+                // the actual used_today count from the DB.
+                await SupabaseAuthManager.shared.fetchUserProfile()
             } catch {
                 ClickyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
