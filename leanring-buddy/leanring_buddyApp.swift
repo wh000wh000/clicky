@@ -57,22 +57,40 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
         }
         registerAsLoginItemIfNeeded()
         // startSparkleUpdater()
+
+        // Register for the Apple Event that macOS fires when a URL matching our
+        // custom scheme (clicky://) is opened — works for both fresh launches and
+        // already-running instances. This is the reliable mechanism for URL scheme
+        // handling in macOS, especially for LSUIElement agent apps.
+        // Event class 0x4755524C ('GURL') + event ID 0x4755524C ('GURL') is the
+        // standard kInternetEventClass/kAEGetURL pair from Carbon's Internet.h.
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleGetURLAppleEvent(_:withReplyEvent:)),
+            forEventClass: AEEventClass(0x4755524C),
+            andEventID:    AEEventID(0x4755524C)
+        )
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         companionManager.stop()
     }
 
-    /// Handles deep links opened via the `clicky://` custom URL scheme.
-    /// Supabase email confirmation redirects to `clicky://auth/callback#access_token=...`
-    /// after the user clicks the link in their inbox. macOS routes that URL here,
-    /// whether the app was already running or just launched to handle the link.
-    func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls {
-            guard url.scheme == "clicky" else { continue }
-            Task {
-                await SupabaseAuthManager.shared.handleAuthCallback(url: url)
-            }
+    /// Called by macOS when the user opens a `clicky://` URL (e.g. by clicking
+    /// the Supabase email confirmation link). Extracts the URL string from the
+    /// Apple Event descriptor and forwards it to `SupabaseAuthManager`.
+    @objc private func handleGetURLAppleEvent(
+        _ event: NSAppleEventDescriptor,
+        withReplyEvent replyEvent: NSAppleEventDescriptor
+    ) {
+        // keyDirectObject = 0x2D2D2D2D ('----') — the primary parameter of the event.
+        guard
+            let urlString = event.paramDescriptor(forKeyword: AEKeyword(0x2D2D2D2D))?.stringValue,
+            let url = URL(string: urlString)
+        else { return }
+
+        Task {
+            await SupabaseAuthManager.shared.handleAuthCallback(url: url)
         }
     }
 
