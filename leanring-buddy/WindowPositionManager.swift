@@ -20,7 +20,6 @@ enum PermissionRequestPresentationDestination: Equatable {
 class WindowPositionManager {
     private static var hasAttemptedAccessibilitySystemPromptDuringCurrentLaunch = false
     private static var hasAttemptedScreenRecordingSystemPromptDuringCurrentLaunch = false
-    private static let hasPreviouslyConfirmedScreenRecordingPermissionUserDefaultsKey = "com.learningbuddy.hasPreviouslyConfirmedScreenRecordingPermission"
 
     /// Returns true when the Mac currently has more than one connected display.
     /// Uses AppKit's screen list, which is available without ScreenCaptureKit's
@@ -79,35 +78,12 @@ class WindowPositionManager {
 
     // MARK: - Screen Recording Permission
 
-    /// Returns true if Screen Recording permission is granted.
+    /// Returns the raw result of CGPreflightScreenCaptureAccess().
+    /// NOTE: On macOS 15 this returns false-negatives even when the user
+    /// has granted Screen Recording. CompanionManager validates the real
+    /// capability at startup with an actual ScreenCaptureKit capture.
     static func hasScreenRecordingPermission() -> Bool {
-        let hasScreenRecordingPermissionNow = CGPreflightScreenCaptureAccess()
-        if hasScreenRecordingPermissionNow {
-            UserDefaults.standard.set(true, forKey: hasPreviouslyConfirmedScreenRecordingPermissionUserDefaultsKey)
-        }
-        return hasScreenRecordingPermissionNow
-    }
-
-    /// Returns true when the app should proceed with session launch without showing
-    /// the permission gate again. This intentionally falls back to the last known
-    /// granted state because CGPreflightScreenCaptureAccess() can sometimes return a
-    /// false negative even though the user has already approved the app.
-    static func shouldTreatScreenRecordingPermissionAsGrantedForSessionLaunch() -> Bool {
-        shouldTreatScreenRecordingPermissionAsGrantedForSessionLaunch(
-            hasScreenRecordingPermissionNow: hasScreenRecordingPermission(),
-            hasPreviouslyConfirmedScreenRecordingPermission: UserDefaults.standard.bool(forKey: hasPreviouslyConfirmedScreenRecordingPermissionUserDefaultsKey)
-        )
-    }
-
-    static func shouldTreatScreenRecordingPermissionAsGrantedForSessionLaunch(
-        hasScreenRecordingPermissionNow: Bool,
-        hasPreviouslyConfirmedScreenRecordingPermission: Bool
-    ) -> Bool {
-        hasScreenRecordingPermissionNow || hasPreviouslyConfirmedScreenRecordingPermission
-    }
-
-    static func clearPreviouslyConfirmedScreenRecordingPermission() {
-        UserDefaults.standard.removeObject(forKey: hasPreviouslyConfirmedScreenRecordingPermissionUserDefaultsKey)
+        CGPreflightScreenCaptureAccess()
     }
 
     /// Prompts the system dialog for Screen Recording permission.
@@ -131,9 +107,8 @@ class WindowPositionManager {
             // Returns true synchronously if already authorized (no dialog shown).
             // Returns false if not authorized (may show a one-time system dialog).
             let isAlreadyAuthorized = CGRequestScreenCaptureAccess()
-            if isAlreadyAuthorized {
-                UserDefaults.standard.set(true, forKey: hasPreviouslyConfirmedScreenRecordingPermissionUserDefaultsKey)
-            } else {
+            print("🔑 Screen Recording — CGRequestAccess: \(isAlreadyAuthorized)")
+            if !isAlreadyAuthorized {
                 // Not yet authorized — open System Settings so the user can toggle
                 // the switch. CGRequestScreenCaptureAccess() may have shown a dialog
                 // on the very first call; on subsequent calls it's silent.

@@ -385,7 +385,7 @@ struct CompanionPanelView: View {
 
                     Text(isGranted
                          ? "Only takes a screenshot when you use the hotkey"
-                         : "Grant then tap again — or restart if granting for the first time")
+                         : "If already enabled in Settings, toggle it off then on again")
                         .font(.system(size: 10))
                         .foregroundColor(DS.Colors.textTertiary)
                 }

@@ -363,9 +363,6 @@
         }
       }
     },
-    "Grant then tap again — or restart if granting for the first time" : {
-
-    },
     "Granted" : {
       "localizations" : {
         "zh-Hans" : {
@@ -446,6 +443,9 @@
         }
       }
     },
+    "I can't see your screen right now. Please open the Clicky panel and re-grant screen recording permission." : {
+
+    },
     "I'm all out of credits. Please DM Farza and tell him to bring me back to life." : {
       "localizations" : {
         "zh-Hans" : {
@@ -455,6 +455,9 @@
           }
         }
       }
+    },
+    "If already enabled in Settings, toggle it off then on again" : {
+
     },
     "If I keep building this, I'll keep you in the loop." : {
       "extractionState" : "stale",

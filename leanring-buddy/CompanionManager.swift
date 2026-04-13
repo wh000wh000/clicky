@@ -212,7 +212,14 @@ final class CompanionManager: ObservableObject {
 
     func start() {
         refreshAllPermissions()
-        print("🔑 Clicky start — accessibility: \(hasAccessibilityPermission), screen: \(hasScreenRecordingPermission), mic: \(hasMicrophonePermission), screenContent: \(hasScreenContentPermission), onboarded: \(hasCompletedOnboarding)")
+        print("🔑 Clicky start — CGPreflight: \(CGPreflightScreenCaptureAccess()), AX: \(AXIsProcessTrusted()), screen: \(hasScreenRecordingPermission), screenContent: \(hasScreenContentPermission), mic: \(hasMicrophonePermission), onboarded: \(hasCompletedOnboarding)")
+
+        // Validate screen capture permission with an actual capture attempt.
+        // CGPreflightScreenCaptureAccess() returns false-negatives on macOS 15
+        // even when ScreenCaptureKit works fine. A real capture is the only
+        // reliable check.
+        validateScreenCapturePermissionWithRealCapture()
+
         startPermissionPolling()
         bindVoiceStateObservation()
         bindAudioPowerLevel()
@@ -305,6 +312,7 @@ final class CompanionManager: ObservableObject {
         let previouslyHadAccessibility = hasAccessibilityPermission
         let previouslyHadScreenRecording = hasScreenRecordingPermission
         let previouslyHadMicrophone = hasMicrophonePermission
+        let previouslyHadScreenContent = hasScreenContentPermission
         let previouslyHadAll = allPermissionsGranted
 
         let currentlyHasAccessibility = WindowPositionManager.hasAccessibilityPermission()
@@ -316,20 +324,24 @@ final class CompanionManager: ObservableObject {
             globalPushToTalkShortcutMonitor.stop()
         }
 
-        // Use the session-launch check instead of the raw API call:
-        // CGPreflightScreenCaptureAccess() returns false-negatives on macOS 15 Sequoia
-        // even when the user has already granted permission. The fallback reads the
-        // UserDefaults flag that was persisted the last time the API returned true.
-        hasScreenRecordingPermission = WindowPositionManager.shouldTreatScreenRecordingPermissionAsGrantedForSessionLaunch()
+        // Screen recording permission is validated at startup by a real
+        // capture test (validateScreenCapturePermissionWithRealCapture).
+        // CGPreflightScreenCaptureAccess() is unreliable on macOS 15 (false
+        // negatives), so we only let it UPGRADE the state (false → true),
+        // never downgrade (true → false) if the real capture already confirmed.
+        if !hasScreenRecordingPermission {
+            hasScreenRecordingPermission = CGPreflightScreenCaptureAccess()
+        }
 
         let micAuthStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         hasMicrophonePermission = micAuthStatus == .authorized
 
-        // Debug: log permission state on changes
+        // Debug: log permission state on ANY change (including screenContent)
         if previouslyHadAccessibility != hasAccessibilityPermission
             || previouslyHadScreenRecording != hasScreenRecordingPermission
-            || previouslyHadMicrophone != hasMicrophonePermission {
-            print("🔑 Permissions — accessibility: \(hasAccessibilityPermission), screen: \(hasScreenRecordingPermission), mic: \(hasMicrophonePermission), screenContent: \(hasScreenContentPermission)")
+            || previouslyHadMicrophone != hasMicrophonePermission
+            || previouslyHadScreenContent != hasScreenContentPermission {
+            print("🔑 Permissions changed — accessibility: \(previouslyHadAccessibility)→\(hasAccessibilityPermission), screen: \(previouslyHadScreenRecording)→\(hasScreenRecordingPermission), mic: \(previouslyHadMicrophone)→\(hasMicrophonePermission), screenContent: \(previouslyHadScreenContent)→\(hasScreenContentPermission)")
         }
 
         // Track individual permission grants as they happen
@@ -342,11 +354,10 @@ final class CompanionManager: ObservableObject {
         if !previouslyHadMicrophone && hasMicrophonePermission {
             ClickyAnalytics.trackPermissionGranted(permission: "microphone")
         }
-        // Screen content permission is persisted — once the user has approved the
-        // SCShareableContent picker, we don't need to re-check it.
-        if !hasScreenContentPermission {
-            hasScreenContentPermission = UserDefaults.standard.bool(forKey: "hasScreenContentPermission")
-        }
+        // Screen content permission is determined by the real capture test
+        // at startup (validateScreenCapturePermissionWithRealCapture).
+        // No UserDefaults fallback — stale caches caused false positives
+        // across Xcode rebuilds where the TCC entry no longer matched.
 
         if !previouslyHadAll && allPermissionsGranted {
             ClickyAnalytics.trackAllPermissionsGranted()
@@ -387,12 +398,11 @@ final class CompanionManager: ObservableObject {
                 // Verify the capture actually returned real content — a 0x0 or
                 // fully-empty image means the user denied the prompt.
                 let didCapture = image.width > 0 && image.height > 0
-                print("🔑 Screen content capture result — width: \(image.width), height: \(image.height), didCapture: \(didCapture)")
+                print("🔑 Screen content capture result — \(image.width)x\(image.height), didCapture: \(didCapture)")
                 await MainActor.run {
                     isRequestingScreenContent = false
                     guard didCapture else { return }
                     hasScreenContentPermission = true
-                    UserDefaults.standard.set(true, forKey: "hasScreenContentPermission")
                     ClickyAnalytics.trackPermissionGranted(permission: "screen_content")
 
                     // If onboarding was already completed, show the cursor overlay now
@@ -403,15 +413,61 @@ final class CompanionManager: ObservableObject {
                     }
                 }
             } catch {
-                print("⚠️ Screen content permission request failed: \(error)")
-                // ScreenCaptureKit throws when the underlying screen recording TCC
-                // permission isn't granted for this app build. Automatically request
-                // screen recording permission so the user can unblock the flow without
-                // knowing which permission gate to fix first.
+                print("⚠️ Screen content permission request failed: \(error.localizedDescription)")
+                // ScreenCaptureKit throws -3801 when the underlying screen
+                // recording TCC isn't granted for this build's code signature.
+                // Reset in-memory permission state and prompt for Screen Recording.
                 await MainActor.run {
                     isRequestingScreenContent = false
+                    hasScreenRecordingPermission = false
+                    hasScreenContentPermission = false
                     WindowPositionManager.requestScreenRecordingPermission()
                 }
+            }
+        }
+    }
+
+    /// Performs a real lightweight screen capture at startup to determine
+    /// whether ScreenCaptureKit actually works for this build. This is the
+    /// only reliable permission check on macOS 15, where
+    /// CGPreflightScreenCaptureAccess() returns false-negatives even when
+    /// the user has already granted Screen Recording in System Settings.
+    ///
+    /// If the capture succeeds, both hasScreenRecordingPermission and
+    /// hasScreenContentPermission are set to true (regardless of what
+    /// CGPreflight says). If it fails with -3801, both are set to false
+    /// so the panel shows Grant buttons.
+    private func validateScreenCapturePermissionWithRealCapture() {
+        Task {
+            do {
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                guard let display = content.displays.first else { return }
+                let filter = SCContentFilter(display: display, excludingWindows: [])
+                let config = SCStreamConfiguration()
+                config.width = 160
+                config.height = 120
+                let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                let didCapture = image.width > 0 && image.height > 0
+
+                if didCapture {
+                    // Real capture works — trust this over CGPreflight.
+                    // No UserDefaults persistence — re-validated each launch.
+                    hasScreenRecordingPermission = true
+                    hasScreenContentPermission = true
+                    print("🔑 Screen capture validated — permission granted (CGPreflight was \(CGPreflightScreenCaptureAccess()))")
+
+                    // Show overlay if all other conditions are met
+                    if hasCompletedOnboarding && allPermissionsGranted && isClickyCursorEnabled && !isOverlayVisible {
+                        overlayWindowManager.hasShownOverlayBefore = true
+                        overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
+                        isOverlayVisible = true
+                    }
+                }
+            } catch {
+                // Real capture failed — permission is genuinely not granted.
+                print("🔑 Screen capture validation failed — \(error.localizedDescription)")
+                hasScreenRecordingPermission = false
+                hasScreenContentPermission = false
             }
         }
     }
@@ -847,6 +903,15 @@ final class CompanionManager: ObservableObject {
                 // Refresh profile so the usage counter in the panel reflects
                 // the actual used_today count from the DB.
                 await SupabaseAuthManager.shared.fetchUserProfile()
+            } catch let nsError as NSError where nsError.domain == "com.apple.ScreenCaptureKit.SCStreamErrorDomain" {
+                // TCC permission was revoked (e.g. new Xcode build
+                // invalidated the signing identity). Reset in-memory
+                // permission state so the panel shows Grant buttons.
+                print("⚠️ Screen capture TCC denied (code \(nsError.code)) — resetting permission state")
+                hasScreenContentPermission = false
+                hasScreenRecordingPermission = false
+                voiceState = .idle
+                speakScreenPermissionErrorFallback()
             } catch {
                 ClickyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
@@ -889,6 +954,15 @@ final class CompanionManager: ObservableObject {
             overlayWindowManager.fadeOutAndHideOverlay()
             isOverlayVisible = false
         }
+    }
+
+    /// Speaks a short message when screen capture permission is denied,
+    /// telling the user to re-grant access in System Settings.
+    private func speakScreenPermissionErrorFallback() {
+        let utterance = String(localized: "I can't see your screen right now. Please open the Clicky panel and re-grant screen recording permission.")
+        let synthesizer = NSSpeechSynthesizer()
+        synthesizer.startSpeaking(utterance)
+        voiceState = .responding
     }
 
     /// Speaks a hardcoded error message using macOS system TTS when API
