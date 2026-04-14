@@ -11,6 +11,7 @@ import SwiftUI
 
 struct APISettingsView: View {
     @ObservedObject var apiConfiguration: APIConfiguration
+    var companionManager: CompanionManager?
     @Environment(\.dismiss) private var dismiss
 
     // Local state for API key fields — committed to Keychain on disappear
@@ -33,6 +34,7 @@ struct APISettingsView: View {
                 elementDetectionSection
                 Divider().background(DS.Colors.borderSubtle)
                 resetButton
+                resetOnboardingButton
             }
             .padding(20)
         }
@@ -315,6 +317,35 @@ struct APISettingsView: View {
                 Image(systemName: "arrow.counterclockwise")
                     .font(.system(size: 11, weight: .medium))
                 Text("Reset to Defaults")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundColor(DS.Colors.textSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
+                    .fill(DS.Colors.surface1)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
+                    .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .pointerCursor()
+    }
+
+    // MARK: - Reset Onboarding
+
+    private var resetOnboardingButton: some View {
+        Button(action: {
+            companionManager?.resetOnboarding()
+            dismiss()
+        }) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 11, weight: .medium))
+                Text("Reset Onboarding")
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(DS.Colors.textSecondary)

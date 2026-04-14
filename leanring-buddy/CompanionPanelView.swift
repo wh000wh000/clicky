@@ -137,7 +137,7 @@ struct CompanionPanelView: View {
         .frame(width: 320)
         .background(panelBackground)
         .sheet(isPresented: $showAPISettings) {
-            APISettingsView(apiConfiguration: APIConfiguration.shared)
+            APISettingsView(apiConfiguration: APIConfiguration.shared, companionManager: companionManager)
                 .onDisappear {
                     companionManager.reloadAPIClients()
                 }
@@ -720,7 +720,8 @@ struct CompanionPanelView: View {
     // MARK: - Model Picker
 
     private var modelPickerRow: some View {
-        HStack {
+        let models = apiConfig.panelPickerModels
+        return HStack {
             Text("Model")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(DS.Colors.textSecondary)
@@ -728,8 +729,9 @@ struct CompanionPanelView: View {
             Spacer()
 
             HStack(spacing: 0) {
-                modelOptionButton(label: "Sonnet", modelID: "claude-sonnet-4-6")
-                modelOptionButton(label: "Opus", modelID: "claude-opus-4-6")
+                ForEach(Array(models.enumerated()), id: \.offset) { _, model in
+                    modelOptionButton(label: model.label, modelID: model.id)
+                }
             }
             .background(
                 RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)

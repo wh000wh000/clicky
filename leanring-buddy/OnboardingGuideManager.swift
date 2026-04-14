@@ -13,21 +13,21 @@ import Foundation
 
 enum OnboardingStep: Int, CaseIterable {
     case welcome = 0
-    case voiceInteraction = 1
-    case textInput = 2
-    case cursorPopup = 3
+    case textInput = 1
+    case cursorPopup = 2
+    case voiceInteraction = 3
     case completed = 4
 
     var guideBubbleText: String {
         switch self {
         case .welcome:
             return String(localized: "hey! i'm clicky, your screen assistant. grant the permissions above to get started.")
-        case .voiceInteraction:
-            return String(localized: "hold control+option to talk to me! release when you're done.")
         case .textInput:
-            return String(localized: "can't talk? click the menu bar icon and type your question instead.")
+            return String(localized: "click the menu bar icon and type your question to get started!")
         case .cursorPopup:
             return String(localized: "try cmd+shift+space to open a quick panel right at your cursor!")
+        case .voiceInteraction:
+            return String(localized: "hold control+option to talk to me! release when you're done.")
         case .completed:
             return ""
         }
@@ -66,11 +66,11 @@ final class OnboardingGuideManager: ObservableObject {
         switch (currentStep, event) {
         case (.welcome, .allPermissionsGranted):
             advanceToNextStep()
-        case (.voiceInteraction, .voiceInteractionCompleted):
-            advanceToNextStep()
         case (.textInput, .textQuerySent):
             advanceToNextStep()
         case (.cursorPopup, .cursorPopupOpened):
+            advanceToNextStep()
+        case (.voiceInteraction, .voiceInteractionCompleted):
             advanceToNextStep()
         default:
             break

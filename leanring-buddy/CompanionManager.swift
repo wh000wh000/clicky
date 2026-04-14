@@ -132,13 +132,17 @@ final class CompanionManager: ObservableObject {
     /// Used by the panel to show accurate status text ("Active" vs "Ready").
     @Published private(set) var isOverlayVisible: Bool = false
 
-    /// The Claude model used for voice responses. Persisted to UserDefaults.
-    @Published var selectedModel: String = UserDefaults.standard.string(forKey: "selectedClaudeModel") ?? "claude-sonnet-4-6"
+    /// The chat model used for voice/text responses. Persisted to UserDefaults.
+    /// Falls back to APIConfiguration's current model when no prior selection exists.
+    @Published var selectedModel: String = UserDefaults.standard.string(forKey: "selectedClaudeModel")
+        ?? APIConfiguration.shared.chatAPIModel
 
     func setSelectedModel(_ model: String) {
         selectedModel = model
         UserDefaults.standard.set(model, forKey: "selectedClaudeModel")
         claudeAPI.model = model
+        openAICompatibleChatAPI.model = model
+        APIConfiguration.shared.chatAPIModel = model
     }
 
     /// Default quick action presets shown in the panel and cursor popup.
@@ -211,6 +215,16 @@ final class CompanionManager: ObservableObject {
     }
 
     func start() {
+        // Validate selectedModel against the current API provider before any
+        // API client is lazily initialized. Without this, a stale model ID
+        // from a previous provider (e.g. "claude-sonnet-4-6" after switching
+        // to SiliconFlow) would cause every request to fail.
+        let pickerModels = APIConfiguration.shared.panelPickerModels
+        if !pickerModels.contains(where: { $0.id == selectedModel }) {
+            selectedModel = APIConfiguration.shared.chatAPIModel
+            UserDefaults.standard.set(selectedModel, forKey: "selectedClaudeModel")
+        }
+
         refreshAllPermissions()
         print("🔑 Clicky start — CGPreflight: \(CGPreflightScreenCaptureAccess()), AX: \(AXIsProcessTrusted()), screen: \(hasScreenRecordingPermission), screenContent: \(hasScreenContentPermission), mic: \(hasMicrophonePermission), onboarded: \(hasCompletedOnboarding)")
 
@@ -258,6 +272,15 @@ final class CompanionManager: ObservableObject {
         onboardingGuideManager.startGuide()
     }
 
+    /// Resets onboarding state so the user can re-experience the tutorial.
+    /// Hides the overlay and resets the guide steps back to the beginning.
+    func resetOnboarding() {
+        hasCompletedOnboarding = false
+        onboardingGuideManager.resetGuide()
+        overlayWindowManager.hideOverlay()
+        isOverlayVisible = false
+    }
+
     func clearDetectedElementLocation() {
         detectedElementScreenLocation = nil
         detectedElementDisplayFrame = nil
@@ -285,6 +308,15 @@ final class CompanionManager: ObservableObject {
     /// APISettingsView. Called when the settings sheet is dismissed.
     func reloadAPIClients() {
         let config = APIConfiguration.shared
+
+        // Ensure selectedModel is valid for the current API format.
+        // If it doesn't match any picker model, reset to the config's default.
+        let pickerModels = config.panelPickerModels
+        if !pickerModels.contains(where: { $0.id == selectedModel }) {
+            selectedModel = config.chatAPIModel
+            UserDefaults.standard.set(selectedModel, forKey: "selectedClaudeModel")
+        }
+
         claudeAPI = ClaudeAPI(
             proxyURL: config.resolvedChatURL,
             model: selectedModel,
@@ -888,7 +920,7 @@ final class CompanionManager: ObservableObject {
                     } catch {
                         ClickyAnalytics.trackTTSError(error: error.localizedDescription)
                         print("⚠️ TTS error: \(error)")
-                        speakCreditsErrorFallback()
+                        speakContextualErrorFallback(error)
                     }
                 }
             } catch is CancellationError {
@@ -915,7 +947,7 @@ final class CompanionManager: ObservableObject {
             } catch {
                 ClickyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
-                speakCreditsErrorFallback()
+                speakContextualErrorFallback(error)
             }
 
             if !Task.isCancelled {
@@ -966,10 +998,49 @@ final class CompanionManager: ObservableObject {
     }
 
     /// Speaks a hardcoded error message using macOS system TTS when API
-    /// credits run out. Uses NSSpeechSynthesizer so it works even when
-    /// ElevenLabs is down.
+    /// credits run out (proxy mode only). Uses NSSpeechSynthesizer so it
+    /// works even when ElevenLabs is down.
     private func speakCreditsErrorFallback() {
         let utterance = String(localized: "I'm all out of credits. Please DM Farza and tell him to bring me back to life.")
+        let synthesizer = NSSpeechSynthesizer()
+        synthesizer.startSpeaking(utterance)
+        voiceState = .responding
+    }
+
+    /// Speaks a contextual error message based on the HTTP status code and
+    /// current API mode. In proxy mode, falls back to the "credits" message.
+    /// In direct mode, gives a more helpful diagnostic message.
+    private func speakContextualErrorFallback(_ error: Error) {
+        let isDirectMode = APIConfiguration.shared.chatAPIMode == .direct
+
+        // Extract HTTP status code from NSError if available
+        let statusCode: Int? = (error as NSError).domain == "OpenAICompatibleChatAPI"
+            || (error as NSError).domain == "ClaudeAPI"
+            ? (error as NSError).code
+            : nil
+
+        let utterance: String
+        if !isDirectMode {
+            // Proxy mode: generic credits message (Worker handles auth/quota)
+            utterance = String(localized: "I'm all out of credits. Please DM Farza and tell him to bring me back to life.")
+        } else if let code = statusCode {
+            switch code {
+            case 401, 403:
+                utterance = String(localized: "API key is invalid or expired. Please check your API key in the settings.")
+            case 402:
+                utterance = String(localized: "Your API account balance is insufficient. Please top up your account.")
+            case 404:
+                utterance = String(localized: "The selected model was not found. Please check the model name in settings.")
+            case 429:
+                utterance = String(localized: "Too many requests. Please wait a moment and try again.")
+            default:
+                utterance = String(localized: "Something went wrong with the API request. Please check the settings and try again.")
+            }
+        } else {
+            // Network error or other non-HTTP error
+            utterance = String(localized: "I couldn't reach the API server. Please check your network connection and settings.")
+        }
+
         let synthesizer = NSSpeechSynthesizer()
         synthesizer.startSpeaking(utterance)
         voiceState = .responding

@@ -141,6 +141,7 @@
       }
     },
     "can't talk? click the menu bar icon and type your question instead." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -151,6 +152,9 @@
       }
     },
     "Cancel" : {
+
+    },
+    "click the menu bar icon and type your question to get started!" : {
 
     },
     "click this!" : {
@@ -646,6 +650,9 @@
           }
         }
       }
+    },
+    "Reset Onboarding" : {
+
     },
     "Reset to Defaults" : {
 

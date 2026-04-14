@@ -167,6 +167,24 @@ final class APIConfiguration: ObservableObject {
         }
     }
 
+    /// Returns the two models shown in the panel's quick model picker,
+    /// matched to the current effective API format so the labels and IDs
+    /// stay in sync with the active provider.
+    var panelPickerModels: [(id: String, label: String)] {
+        let format = effectiveChatAPIFormat
+        if format == .openaiCompatible {
+            return [
+                (id: APIPreset.siliconFlow.chatModels[0].id, label: "397B"),
+                (id: APIPreset.siliconFlow.chatModels[1].id, label: "122B"),
+            ]
+        } else {
+            return [
+                (id: APIPreset.anthropic.chatModels[0].id, label: "Sonnet"),
+                (id: APIPreset.anthropic.chatModels[1].id, label: "Opus"),
+            ]
+        }
+    }
+
     // MARK: - TTS API
 
     @Published var ttsProvider: TTSProvider {
