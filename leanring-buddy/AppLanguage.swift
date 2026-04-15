@@ -61,6 +61,20 @@ enum AppLanguage: String, CaseIterable {
     }
 }
 
+// MARK: - App Locale Helper
+
+/// Returns the app's selected locale for `String(localized:locale:)` calls.
+/// Reads directly from UserDefaults so it can be called from any isolation
+/// context without requiring `@MainActor`. This is necessary because
+/// `String(localized:)` defaults to `Locale.current` (the system locale),
+/// which does NOT change when the user picks a language in-app. All
+/// `String(localized:)` calls must pass `locale: appLocale` for runtime
+/// language switching to work correctly.
+var appLocale: Locale {
+    let rawValue = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh-Hans"
+    return Locale(identifier: rawValue)
+}
+
 // MARK: - LocalizationManager
 
 @MainActor

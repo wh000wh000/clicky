@@ -22,7 +22,7 @@ enum CompanionVoiceState {
 }
 
 struct QuickActionPreset: Identifiable {
-    let id = UUID()
+    let id: String
     let label: String
     let iconName: String
     let promptText: String
@@ -59,8 +59,9 @@ final class CompanionManager: ObservableObject {
     let globalPushToTalkShortcutMonitor = GlobalPushToTalkShortcutMonitor()
     let overlayWindowManager = OverlayWindowManager()
     let onboardingGuideManager = OnboardingGuideManager()
-    // Response text is now displayed inline on the cursor overlay via
-    // streamingResponseText, so no separate response overlay manager is needed.
+    /// Floating overlay that displays streaming response text near the cursor
+    /// so the user can read Claude's explanation alongside the TTS audio.
+    let responseOverlayManager = CompanionResponseOverlayManager()
 
     /// Manages the cursor-following text input popup (Cmd+Shift+Space).
     lazy var cursorInputPopupManager: CursorInputPopupManager = {
@@ -165,28 +166,35 @@ final class CompanionManager: ObservableObject {
 
     /// Default quick action presets shown in the panel and cursor popup.
     /// Each preset maps a short label to a full prompt sent to Claude.
-    let quickActionPresets: [QuickActionPreset] = [
-        QuickActionPreset(
-            label: String(localized: "Explain this"),
-            iconName: "questionmark.circle",
-            promptText: "What am I looking at on my screen right now? Explain what's happening and what the main content is about."
-        ),
-        QuickActionPreset(
-            label: String(localized: "Summarize"),
-            iconName: "doc.text",
-            promptText: "Summarize the main content visible on my screen. Be concise but capture the key points."
-        ),
-        QuickActionPreset(
-            label: String(localized: "Help me write"),
-            iconName: "pencil.line",
-            promptText: "Look at what I'm writing on screen and help me improve it. Suggest better wording, fix any issues, and make it clearer."
-        ),
-        QuickActionPreset(
-            label: String(localized: "Debug this"),
-            iconName: "ladybug",
-            promptText: "Look at the code or error on my screen. Explain what's wrong and how to fix it."
-        ),
-    ]
+    /// Computed so labels re-resolve against `appLocale` when the user switches language.
+    var quickActionPresets: [QuickActionPreset] {
+        [
+            QuickActionPreset(
+                id: "explain",
+                label: String(localized: "Explain this", locale: appLocale),
+                iconName: "questionmark.circle",
+                promptText: "Look at where my cursor is on screen and explain what's there. Focus on the content near my cursor position — that's what I'm looking at."
+            ),
+            QuickActionPreset(
+                id: "summarize",
+                label: String(localized: "Summarize", locale: appLocale),
+                iconName: "doc.text",
+                promptText: "Summarize the main content visible on my screen. Be concise but capture the key points."
+            ),
+            QuickActionPreset(
+                id: "help-write",
+                label: String(localized: "Help me write", locale: appLocale),
+                iconName: "pencil.line",
+                promptText: "Look at what I'm writing on screen and help me improve it. Suggest better wording, fix any issues, and make it clearer."
+            ),
+            QuickActionPreset(
+                id: "debug",
+                label: String(localized: "Debug this", locale: appLocale),
+                iconName: "ladybug",
+                promptText: "Look at the code or error near my cursor on screen. Explain what's wrong and how to fix it."
+            ),
+        ]
+    }
 
     /// Scene-aware quick action presets that adapt to the frontmost app.
     /// Refreshed each time the cursor input popup is shown.
@@ -732,21 +740,20 @@ final class CompanionManager: ObservableObject {
     /// The core system prompt without a language instruction. The computed property
     /// `companionVoiceResponseSystemPrompt` appends the active language directive at runtime.
     private static let companionVoiceResponseBaseSystemPrompt = """
-    you're clicky, a friendly always-on companion that lives in the user's menu bar. the user just spoke to you via push-to-talk and you can see their screen(s). your reply will be spoken aloud via text-to-speech, so write the way you'd actually talk. this is an ongoing conversation — you remember everything they've said before.
+    you're clicky, a friendly always-on companion that lives in the user's menu bar. the user just spoke to you via push-to-talk and you can see their screen. your reply will be spoken aloud via text-to-speech AND displayed as text near the cursor. this is an ongoing conversation — you remember everything they've said before.
 
     rules:
     - default to one or two sentences. be direct and dense. BUT if the user asks you to explain more, go deeper, or elaborate, then go all out — give a thorough, detailed explanation with no length limit.
     - all lowercase, casual, warm. no emojis.
-    - write for the ear, not the eye. short sentences. no lists, bullet points, markdown, or formatting — just natural speech.
-    - don't use abbreviations or symbols that sound weird read aloud. write "for example" not "e.g.", spell out small numbers.
-    - if the user's question relates to what's on their screen, reference specific things you see.
+    - write naturally for speech — short sentences, no abbreviations or symbols that sound weird read aloud. write "for example" not "e.g.", spell out small numbers.
+    - since your response is also displayed as text, use paragraph breaks between distinct ideas so it's easy to scan visually. still no bullet points, lists, markdown, or formatting — just natural paragraphs.
+    - the screenshot label includes the cursor's pixel position. this tells you what area of the screen the user is focused on. when they ask you to explain or look at something, prioritize the content near their cursor — that's what they're looking at. describe the broader screen context only if it adds useful information.
     - if the screenshot doesn't seem relevant to their question, just answer the question directly.
     - you can help with anything — coding, writing, general knowledge, brainstorming.
     - never say "simply" or "just".
     - don't read out code verbatim. describe what the code does or what needs to change conversationally.
     - focus on giving a thorough, useful explanation. don't end with simple yes/no questions like "want me to explain more?" or "should i show you?" — those are dead ends that force the user to just say yes.
     - instead, when it fits naturally, end by planting a seed — mention something bigger or more ambitious they could try, a related concept that goes deeper, or a next-level technique that builds on what you just explained. make it something worth coming back for, not a question they'd just nod to. it's okay to not end with anything extra if the answer is complete on its own.
-    - if you receive multiple screen images, the one labeled "primary focus" is where the cursor is — prioritize that one but reference others if relevant.
 
     element pointing:
     you have a small blue triangle cursor that can fly to and point at things on screen. use it whenever pointing would genuinely help the user — if they're asking how to do something, looking for a menu, trying to find a button, or need help navigating an app, point at the relevant element. err on the side of pointing rather than not pointing, because it makes your help way more useful and concrete.
@@ -755,7 +762,7 @@ final class CompanionManager: ObservableObject {
 
     when you point, append a coordinate tag at the very end of your response, AFTER your spoken text. the screenshot images are labeled with their pixel dimensions. use those dimensions as the coordinate space. the origin (0,0) is the top-left corner of the image. x increases rightward, y increases downward.
 
-    format: [POINT:x,y:label] where x,y are integer pixel coordinates in the screenshot's coordinate space, and label is a short 1-3 word description of the element (like "search bar" or "save button"). if the element is on the cursor's screen you can omit the screen number. if the element is on a DIFFERENT screen, append :screenN where N is the screen number from the image label (e.g. :screen2). this is important — without the screen number, the cursor will point at the wrong place.
+    format: [POINT:x,y:label] where x,y are integer pixel coordinates in the screenshot's coordinate space, and label is a short 1-3 word description of the element (like "search bar" or "save button").
 
     if pointing wouldn't help, append [POINT:none].
 
@@ -763,7 +770,6 @@ final class CompanionManager: ObservableObject {
     - user asks how to color grade in final cut: "you'll want to open the color inspector — it's right up in the top right area of the toolbar. click that and you'll get all the color wheels and curves. [POINT:1100,42:color inspector]"
     - user asks what html is: "html stands for hypertext markup language, it's basically the skeleton of every web page. curious how it connects to the css you're looking at? [POINT:none]"
     - user asks how to commit in xcode: "see that source control menu up top? click that and hit commit, or you can use command option c as a shortcut. [POINT:285,11:source control]"
-    - element is on screen 2 (not where cursor is): "that's over on your other monitor — see the terminal window? [POINT:400,300:terminal:screen2]"
     """
 
     /// The effective system prompt, appending a language instruction so Claude always
@@ -816,12 +822,14 @@ final class CompanionManager: ObservableObject {
     private func sendTranscriptToClaudeWithScreenshot(transcript: String) {
         currentResponseTask?.cancel()
         elevenLabsTTSClient.stopPlayback()
+        responseOverlayManager.hideOverlay()
 
         currentResponseTask = Task {
-            // Stay in processing (spinner) state — no streaming text displayed
+            // Stay in processing (spinner) state while waiting for Claude's response
             voiceState = .processing
             isQuotaExceeded = false   // Clear any previous quota-exceeded banner
             lastAPIErrorMessage = nil // Clear any previous API error banner
+            let pipelineStartTime = CFAbsoluteTimeGetCurrent()
 
             do {
                 // Capture the user's current scene (frontmost app + window title)
@@ -831,15 +839,36 @@ final class CompanionManager: ObservableObject {
 
                 // Capture all connected screens so the AI has full context
                 let screenCaptures = try await CompanionScreenCaptureUtility.captureAllScreensAsJPEG()
+                let captureElapsedMs = Int((CFAbsoluteTimeGetCurrent() - pipelineStartTime) * 1000)
+                print("⏱ Pipeline: screenshot capture done in \(captureElapsedMs)ms")
 
                 guard !Task.isCancelled else { return }
 
-                // Build image labels with the actual screenshot pixel dimensions
-                // so Claude's coordinate space matches the image it sees. We
-                // scale from screenshot pixels to display points ourselves.
-                let labeledImages = screenCaptures.map { capture in
+                // Only send the cursor screen — the user's attention is always
+                // on the screen where their mouse is. Sending all screens wastes
+                // upload bandwidth, token budget, and AI processing time.
+                let cursorScreenCaptures = screenCaptures.filter { $0.isCursorScreen }
+                let effectiveCaptures = cursorScreenCaptures.isEmpty ? screenCaptures : cursorScreenCaptures
+
+                // Build image labels with pixel dimensions and the cursor's pixel
+                // position so the AI knows exactly where on screen the user is focused.
+                let mouseLocation = NSEvent.mouseLocation
+                let labeledImages = effectiveCaptures.map { capture in
+                    var label = capture.label
                     let dimensionInfo = " (image dimensions: \(capture.screenshotWidthInPixels)x\(capture.screenshotHeightInPixels) pixels)"
-                    return (data: capture.imageData, label: capture.label + dimensionInfo)
+
+                    // Convert the mouse's global AppKit coordinates to the screenshot's
+                    // pixel space (top-left origin) so the AI can locate the cursor area.
+                    if capture.isCursorScreen {
+                        let localX = mouseLocation.x - capture.displayFrame.origin.x
+                        let localY = (capture.displayFrame.origin.y + capture.displayFrame.height) - mouseLocation.y
+                        let pixelX = Int(localX * CGFloat(capture.screenshotWidthInPixels) / capture.displayFrame.width)
+                        let pixelY = Int(localY * CGFloat(capture.screenshotHeightInPixels) / capture.displayFrame.height)
+                        label += " (cursor at pixel \(pixelX), \(pixelY))"
+                    }
+
+                    label += dimensionInfo
+                    return (data: capture.imageData, label: label)
                 }
 
                 // Pass conversation history so Claude remembers prior exchanges
@@ -847,7 +876,12 @@ final class CompanionManager: ObservableObject {
                     (userPlaceholder: entry.userTranscript, assistantResponse: entry.assistantResponse)
                 }
 
-                // Use the appropriate chat API based on configured format
+                // Use the appropriate chat API based on configured format.
+                // Show the response text overlay so the user can read along
+                // while TTS audio plays.
+                var accumulatedStreamingText = ""
+                responseOverlayManager.showOverlayAndBeginStreaming()
+
                 let fullResponseText: String
                 let chatAPIFormat = APIConfiguration.shared.effectiveChatAPIFormat
                 if chatAPIFormat == .openaiCompatible {
@@ -859,7 +893,10 @@ final class CompanionManager: ObservableObject {
                         bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
                             ? await SupabaseAuthManager.shared.validAccessToken()
                             : nil,
-                        onTextChunk: { _ in }
+                        onTextChunk: { [weak self] chunk in
+                            accumulatedStreamingText += chunk
+                            self?.responseOverlayManager.updateStreamingText(accumulatedStreamingText)
+                        }
                     )
                     fullResponseText = responseText
                 } else {
@@ -871,12 +908,22 @@ final class CompanionManager: ObservableObject {
                         bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
                             ? SupabaseAuthManager.shared.currentSession?.accessToken
                             : nil,
-                        onTextChunk: { _ in }
+                        onTextChunk: { [weak self] chunk in
+                            accumulatedStreamingText += chunk
+                            self?.responseOverlayManager.updateStreamingText(accumulatedStreamingText)
+                        }
                     )
                     fullResponseText = responseText
                 }
 
-                guard !Task.isCancelled else { return }
+                let apiElapsedMs = Int((CFAbsoluteTimeGetCurrent() - pipelineStartTime) * 1000)
+                let imageDataSizeKB = labeledImages.reduce(0) { $0 + $1.data.count } / 1024
+                print("⏱ Pipeline: Claude API done in \(apiElapsedMs)ms (sent \(labeledImages.count) image(s), \(imageDataSizeKB)KB total)")
+
+                guard !Task.isCancelled else {
+                    responseOverlayManager.hideOverlay()
+                    return
+                }
 
                 // Refresh userProfile in the background so the panel usage
                 // counter reflects the incremented daily_chat_count from the DB.
@@ -888,6 +935,9 @@ final class CompanionManager: ObservableObject {
                 // Parse the [POINT:...] tag from Claude's response
                 let parseResult = Self.parsePointingCoordinates(from: fullResponseText)
                 let spokenText = parseResult.spokenText
+
+                // Update the overlay with the clean text (POINT tag stripped)
+                responseOverlayManager.updateStreamingText(spokenText)
 
                 // Handle element pointing if Claude returned coordinates.
                 // Switch to idle BEFORE setting the location so the triangle
@@ -902,10 +952,10 @@ final class CompanionManager: ObservableObject {
                 // falling back to the cursor screen if not specified.
                 let targetScreenCapture: CompanionScreenCapture? = {
                     if let screenNumber = parseResult.screenNumber,
-                       screenNumber >= 1 && screenNumber <= screenCaptures.count {
-                        return screenCaptures[screenNumber - 1]
+                       screenNumber >= 1 && screenNumber <= effectiveCaptures.count {
+                        return effectiveCaptures[screenNumber - 1]
                     }
-                    return screenCaptures.first(where: { $0.isCursorScreen })
+                    return effectiveCaptures.first(where: { $0.isCursorScreen })
                 }()
 
                 if let pointCoordinate = parseResult.coordinate,
@@ -936,34 +986,39 @@ final class CompanionManager: ObservableObject {
                         y: appKitY + displayFrame.origin.y
                     )
 
+                    // Use Claude's rough estimate immediately so the cursor
+                    // starts flying while the precise detector runs in parallel.
+                    detectedElementScreenLocation = claudeGlobalLocation
+                    detectedElementDisplayFrame = displayFrame
+
                     // If an element location detector is configured (e.g. UI-TARS),
-                    // use it to refine Claude's rough coordinate to a precise pixel location.
-                    // Fall back to Claude's estimate if the detector fails or returns nil.
-                    var finalGlobalLocation = claudeGlobalLocation
+                    // refine the coordinate in the background. The detector's result
+                    // updates the location after the cursor has already started its
+                    // flight, so there's no added latency to the TTS pipeline.
                     if let detector = elementLocationDetector,
                        let elementLabel = parseResult.elementLabel,
                        !elementLabel.isEmpty {
-                        print("🎯 Element pointing: running precise detection for \"\(elementLabel)\"...")
-                        if let refinedDisplayLocalCoordinate = await detector.detectElementLocation(
-                            screenshotData: targetScreenCapture.imageData,
-                            elementQuery: elementLabel,
-                            displayWidthInPoints: targetScreenCapture.displayWidthInPoints,
-                            displayHeightInPoints: targetScreenCapture.displayHeightInPoints
-                        ) {
-                            // detector returns display-local AppKit coords (bottom-left origin);
-                            // add the display's global offset to get global screen coords.
-                            finalGlobalLocation = CGPoint(
-                                x: refinedDisplayLocalCoordinate.x + displayFrame.origin.x,
-                                y: refinedDisplayLocalCoordinate.y + displayFrame.origin.y
-                            )
-                            print("🎯 Element pointing: refined (\(Int(claudeGlobalLocation.x)), \(Int(claudeGlobalLocation.y))) → (\(Int(finalGlobalLocation.x)), \(Int(finalGlobalLocation.y)))")
-                        } else {
-                            print("🎯 Element pointing: detector returned nil, using Claude's estimate")
+                        let capturedDisplayFrame = displayFrame
+                        let capturedScreenCapture = targetScreenCapture
+                        Task {
+                            print("🎯 Element pointing: running precise detection for \"\(elementLabel)\"...")
+                            if let refinedDisplayLocalCoordinate = await detector.detectElementLocation(
+                                screenshotData: capturedScreenCapture.imageData,
+                                elementQuery: elementLabel,
+                                displayWidthInPoints: capturedScreenCapture.displayWidthInPoints,
+                                displayHeightInPoints: capturedScreenCapture.displayHeightInPoints
+                            ) {
+                                let refinedGlobalLocation = CGPoint(
+                                    x: refinedDisplayLocalCoordinate.x + capturedDisplayFrame.origin.x,
+                                    y: refinedDisplayLocalCoordinate.y + capturedDisplayFrame.origin.y
+                                )
+                                self.detectedElementScreenLocation = refinedGlobalLocation
+                                print("🎯 Element pointing: refined (\(Int(claudeGlobalLocation.x)), \(Int(claudeGlobalLocation.y))) → (\(Int(refinedGlobalLocation.x)), \(Int(refinedGlobalLocation.y)))")
+                            } else {
+                                print("🎯 Element pointing: detector returned nil, using Claude's estimate")
+                            }
                         }
                     }
-
-                    detectedElementScreenLocation = finalGlobalLocation
-                    detectedElementDisplayFrame = displayFrame
                     ClickyAnalytics.trackElementPointed(elementLabel: parseResult.elementLabel)
                     print("🎯 Element pointing: (\(Int(pointCoordinate.x)), \(Int(pointCoordinate.y))) → \"\(parseResult.elementLabel ?? "element")\"")
                 } else {
@@ -1007,19 +1062,29 @@ final class CompanionManager: ObservableObject {
                             )
                         }
                         // speakText returns after player.play() — audio is now playing
+                        let ttsElapsedMs = Int((CFAbsoluteTimeGetCurrent() - pipelineStartTime) * 1000)
+                        print("⏱ Pipeline: TTS ready in \(ttsElapsedMs)ms (total from start)")
                         voiceState = .responding
+                        // Begin auto-hide countdown for the text overlay
+                        responseOverlayManager.finishStreaming()
                     } catch {
                         ClickyAnalytics.trackTTSError(error: error.localizedDescription)
                         print("⚠️ TTS error: \(error)")
+                        responseOverlayManager.finishStreaming()
                         speakContextualErrorFallback(error)
                     }
+                } else {
+                    // No spoken text — hide the overlay immediately
+                    responseOverlayManager.finishStreaming()
                 }
             } catch is CancellationError {
                 // User spoke again — response was interrupted
+                responseOverlayManager.hideOverlay()
             } catch let quotaError as ChatQuotaExceededError {
                 // 429 daily_limit_exceeded: show a panel banner instead of
                 // speaking the credits-error fallback, since the user is not
                 // "out of credits" — they just need to wait until tomorrow.
+                responseOverlayManager.hideOverlay()
                 isQuotaExceeded = true
                 voiceState = .idle
                 print("⚠️ Quota exceeded: \(quotaError.message)")
@@ -1030,12 +1095,14 @@ final class CompanionManager: ObservableObject {
                 // TCC permission was revoked (e.g. new Xcode build
                 // invalidated the signing identity). Reset in-memory
                 // permission state so the panel shows Grant buttons.
+                responseOverlayManager.hideOverlay()
                 print("⚠️ Screen capture TCC denied (code \(nsError.code)) — resetting permission state")
                 hasScreenContentPermission = false
                 hasScreenRecordingPermission = false
                 voiceState = .idle
                 speakScreenPermissionErrorFallback()
             } catch {
+                responseOverlayManager.hideOverlay()
                 ClickyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
                 speakContextualErrorFallback(error)
@@ -1082,7 +1149,7 @@ final class CompanionManager: ObservableObject {
     /// Speaks a short message when screen capture permission is denied,
     /// telling the user to re-grant access in System Settings.
     private func speakScreenPermissionErrorFallback() {
-        let utterance = String(localized: "I can't see your screen right now. Please open the Clicky panel and re-grant screen recording permission.")
+        let utterance = String(localized: "I can't see your screen right now. Please open the Clicky panel and re-grant screen recording permission.", locale: appLocale)
         let voiceIdentifier = LocalizationManager.shared.currentLanguage.nsSpeechSynthesizerVoiceIdentifier
         let synthesizer = NSSpeechSynthesizer(voice: NSSpeechSynthesizer.VoiceName(rawValue: voiceIdentifier)) ?? NSSpeechSynthesizer()
         synthesizer.startSpeaking(utterance)
@@ -1093,7 +1160,7 @@ final class CompanionManager: ObservableObject {
     /// credits run out (proxy mode only). Uses NSSpeechSynthesizer so it
     /// works even when ElevenLabs is down.
     private func speakCreditsErrorFallback() {
-        let utterance = String(localized: "I'm all out of credits. Please DM Farza and tell him to bring me back to life.")
+        let utterance = String(localized: "I'm all out of credits. Please DM Farza and tell him to bring me back to life.", locale: appLocale)
         let voiceIdentifier = LocalizationManager.shared.currentLanguage.nsSpeechSynthesizerVoiceIdentifier
         let synthesizer = NSSpeechSynthesizer(voice: NSSpeechSynthesizer.VoiceName(rawValue: voiceIdentifier)) ?? NSSpeechSynthesizer()
         synthesizer.startSpeaking(utterance)
@@ -1118,33 +1185,33 @@ final class CompanionManager: ObservableObject {
 
         if !isDirectMode {
             // Proxy mode: Worker handles auth/quota, generic message for unexpected errors.
-            utterance = String(localized: "Something went wrong. Please try again later.")
-            bannerMessage = String(localized: "服务出错，请稍后重试。")
+            utterance = String(localized: "Something went wrong. Please try again later.", locale: appLocale)
+            bannerMessage = String(localized: "服务出错，请稍后重试。", locale: appLocale)
         } else if let code = statusCode {
             switch code {
             case 400:
-                utterance = String(localized: "The API rejected the request. Please check the model and voice settings.")
-                bannerMessage = String(localized: "请求被拒绝，请检查模型名称和参数设置。")
+                utterance = String(localized: "The API rejected the request. Please check the model and voice settings.", locale: appLocale)
+                bannerMessage = String(localized: "请求被拒绝，请检查模型名称和参数设置。", locale: appLocale)
             case 401, 403:
-                utterance = String(localized: "API key is invalid or expired. Please check your API key in the settings.")
-                bannerMessage = String(localized: "API Key 无效或未配置，请在设置中填写正确的 Key。")
+                utterance = String(localized: "API key is invalid or expired. Please check your API key in the settings.", locale: appLocale)
+                bannerMessage = String(localized: "API Key 无效或未配置，请在设置中填写正确的 Key。", locale: appLocale)
             case 402:
-                utterance = String(localized: "Your API account balance is insufficient. Please top up your account.")
-                bannerMessage = String(localized: "API 账户余额不足，请充值后重试。")
+                utterance = String(localized: "Your API account balance is insufficient. Please top up your account.", locale: appLocale)
+                bannerMessage = String(localized: "API 账户余额不足，请充值后重试。", locale: appLocale)
             case 404:
-                utterance = String(localized: "The selected model was not found. Please check the model name in settings.")
-                bannerMessage = String(localized: "模型未找到，请检查设置中的模型名称。")
+                utterance = String(localized: "The selected model was not found. Please check the model name in settings.", locale: appLocale)
+                bannerMessage = String(localized: "模型未找到，请检查设置中的模型名称。", locale: appLocale)
             case 429:
-                utterance = String(localized: "Too many requests. Please wait a moment and try again.")
-                bannerMessage = String(localized: "请求过于频繁，请稍后重试。")
+                utterance = String(localized: "Too many requests. Please wait a moment and try again.", locale: appLocale)
+                bannerMessage = String(localized: "请求过于频繁，请稍后重试。", locale: appLocale)
             default:
-                utterance = String(localized: "Something went wrong with the API request. Please check the settings and try again.")
-                bannerMessage = String(localized: "API 请求出错（\(code)），请检查设置后重试。")
+                utterance = String(localized: "Something went wrong with the API request. Please check the settings and try again.", locale: appLocale)
+                bannerMessage = String(localized: "API 请求出错（\(code)），请检查设置后重试。", locale: appLocale)
             }
         } else {
             // Network error or other non-HTTP error
-            utterance = String(localized: "I couldn't reach the API server. Please check your network connection and settings.")
-            bannerMessage = String(localized: "无法连接到 API 服务器，请检查网络和设置。")
+            utterance = String(localized: "I couldn't reach the API server. Please check your network connection and settings.", locale: appLocale)
+            bannerMessage = String(localized: "无法连接到 API 服务器，请检查网络和设置。", locale: appLocale)
         }
 
         // Show a visible banner in the panel so the user sees the error even if

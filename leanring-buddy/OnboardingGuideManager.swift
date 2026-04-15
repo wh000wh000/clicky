@@ -21,13 +21,13 @@ enum OnboardingStep: Int, CaseIterable {
     var guideBubbleText: String {
         switch self {
         case .welcome:
-            return String(localized: "hey! i'm clicky, your screen assistant. grant the permissions above to get started.")
+            return String(localized: "hey! i'm clicky, your screen assistant. grant the permissions above to get started.", locale: appLocale)
         case .textInput:
-            return String(localized: "click the menu bar icon and type your question to get started!")
+            return String(localized: "click the menu bar icon and type your question to get started!", locale: appLocale)
         case .cursorPopup:
-            return String(localized: "try cmd+shift+space to open a quick panel right at your cursor!")
+            return String(localized: "try cmd+shift+space to open a quick panel right at your cursor!", locale: appLocale)
         case .voiceInteraction:
-            return String(localized: "hold control+option to talk to me! release when you're done.")
+            return String(localized: "hold control+option to talk to me! release when you're done.", locale: appLocale)
         case .completed:
             return ""
         }

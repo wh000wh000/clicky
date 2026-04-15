@@ -1,0 +1,190 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - text: 境内商户
+    - link "合作伙伴" [ref=e5] [cursor=pointer]:
+      - /url: /partner/public/home
+    - link "International Business" [ref=e7] [cursor=pointer]:
+      - /url: /index.php/public/wechatpay_en
+  - generic [ref=e9]:
+    - heading "微信支付商户平台" [level=1] [ref=e10]
+    - generic [ref=e11]:
+      - link "首页" [ref=e12] [cursor=pointer]:
+        - /url: /
+      - link "接入指引" [ref=e13] [cursor=pointer]:
+        - /url: /static/applyment_guide/applyment_index.shtml
+      - link "产品中心" [ref=e14] [cursor=pointer]:
+        - /url: /static/product/product_index.shtml
+      - link "解决方案" [ref=e15] [cursor=pointer]:
+        - /url: /static/solution/solution_index.shtml
+      - link "文档中心" [ref=e16] [cursor=pointer]:
+        - /url: https://pay.weixin.qq.com/doc/v3/merchant/4012062524
+      - link "接入微信支付" [ref=e17] [cursor=pointer]:
+        - /url: /index.php/apply/applyment_home/guide_normal
+  - generic [ref=e18]:
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - generic:
+          - list:
+            - listitem [ref=e21]:
+              - link "banner" [ref=e22] [cursor=pointer]:
+                - /url: javascript:;
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]: 微信扫一扫
+          - img [ref=e30] [cursor=pointer]
+        - generic "https://pay.weixin.qq.com/core/home/pay_login_qrcode?session_id=01bd1e8ea3e8809a66c0c24d0d3760cf" [ref=e32]:
+          - img [ref=e33]
+        - generic [ref=e34]:
+          - link "成为商家" [ref=e35] [cursor=pointer]:
+            - /url: /index.php/apply/applyment_home/guide_normal
+          - link "绑定微信号" [ref=e37] [cursor=pointer]:
+            - /url: /static/help_guide/identity_selection.shtml
+          - link "找回商户号" [ref=e39] [cursor=pointer]:
+            - /url: /static/help_guide/retrieve_mchnum.shtml
+      - generic [ref=e42]:
+        - heading "最新公告" [level=2] [ref=e43]
+        - list:
+          - listitem [ref=e44]:
+            - link "[04.02] 微信支付网络变更通知" [ref=e45] [cursor=pointer]:
+              - /url: /index.php/public/cms/content_detail?lang=zh&id=135516
+              - generic [ref=e46]: "[04.02]"
+              - generic [ref=e47]: 微信支付网络变更通知
+          - listitem [ref=e49]:
+            - link "[10.18] 商家转账到零钱功能升级通知" [ref=e50] [cursor=pointer]:
+              - /url: /index.php/public/cms/content_detail?lang=zh&id=134000
+              - generic [ref=e51]: "[10.18]"
+              - generic [ref=e52]: 商家转账到零钱功能升级通知
+        - paragraph [ref=e53]:
+          - link "更多公告 >>" [ref=e54] [cursor=pointer]:
+            - /url: /public/cms/content_list?lang=zh&id=6200
+            - text: 更多公告
+            - generic [ref=e55]: ">>"
+    - generic [ref=e58]:
+      - heading "平台开放能力" [level=2] [ref=e59]
+      - list [ref=e60]:
+        - listitem [ref=e61]:
+          - link "支付产品 满足商家在各类交易场景中快速收款的需求" [ref=e62] [cursor=pointer]:
+            - /url: /static/product/product_index.shtml#payment_product
+            - paragraph [ref=e63]
+            - heading "支付产品" [level=3] [ref=e65]
+            - paragraph [ref=e66]: 满足商家在各类交易场景中快速收款的需求
+        - listitem [ref=e67]:
+          - link "运营工具 红包，代金券，立减折扣等多种营销工具助力商户更好的经营" [ref=e68] [cursor=pointer]:
+            - /url: /static/product/product_index.shtml#business_tool
+            - paragraph [ref=e69]
+            - heading "运营工具" [level=3] [ref=e71]
+            - paragraph [ref=e72]: 红包，代金券，立减折扣等多种营销工具助力商户更好的经营
+        - listitem [ref=e73]:
+          - link "资金管理 为商家提供安全，便捷，可配置的资金解决方案" [ref=e74] [cursor=pointer]:
+            - /url: /static/product/product_index.shtml#fund_manage
+            - paragraph [ref=e75]
+            - heading "资金管理" [level=3] [ref=e77]
+            - paragraph [ref=e78]: 为商家提供安全，便捷，可配置的资金解决方案
+        - listitem [ref=e79]:
+          - link "拓展工具 开放技术能力，为商家提供全方位安全保障" [ref=e80] [cursor=pointer]:
+            - /url: /static/product/product_index.shtml#expand_tool
+            - paragraph [ref=e81]
+            - heading "拓展工具" [level=3] [ref=e83]
+            - paragraph [ref=e84]: 开放技术能力，为商家提供全方位安全保障
+      - paragraph [ref=e85]:
+        - link "查看更多 >>" [ref=e86] [cursor=pointer]:
+          - /url: /static/product/product_index.shtml
+          - text: 查看更多
+          - generic [ref=e87]: ">>"
+    - generic [ref=e88]:
+      - heading "行业解决方案" [level=2] [ref=e89]
+      - generic [ref=e90]:
+        - list:
+          - listitem [ref=e91]:
+            - link [ref=e92] [cursor=pointer]:
+              - /url: /static/solution/solution_index.shtml#ecommerce
+            - generic [ref=e93]:
+              - heading "生活服务" [level=3] [ref=e95]
+              - paragraph [ref=e96]: 通过微信整合能力，助力挖掘流量洼地，整合平台内容、服务和支付能力，为用户提供更友好的体验，助力提升行业效率。
+          - listitem [ref=e98]:
+            - link [ref=e99] [cursor=pointer]:
+              - /url: /static/solution/solution_index.shtml#supermarket
+            - heading "智慧零售" [level=3] [ref=e102]
+          - listitem [ref=e104]:
+            - link [ref=e105] [cursor=pointer]:
+              - /url: /static/solution/solution_index.shtml#drink
+            - heading "智慧餐饮" [level=3] [ref=e108]
+          - listitem [ref=e110]:
+            - link [ref=e111] [cursor=pointer]:
+              - /url: /static/solution/solution_index.shtml#parking
+            - heading "智慧出行" [level=3] [ref=e114]
+          - listitem [ref=e116]:
+            - link [ref=e117] [cursor=pointer]:
+              - /url: /static/solution/solution_index.shtml#school
+            - heading "教育医疗" [level=3] [ref=e120]
+          - listitem [ref=e122]:
+            - link [ref=e123] [cursor=pointer]:
+              - /url: /static/solution/solution_index.shtml#social
+            - heading "政务民生" [level=3] [ref=e126]
+    - generic [ref=e129]:
+      - heading "接入微信支付" [level=2] [ref=e130]
+      - generic [ref=e131]:
+        - list:
+          - listitem [ref=e132]:
+            - paragraph [ref=e133]: "1"
+            - paragraph [ref=e134]: 提交资料
+            - paragraph [ref=e135]: 在线提交营业执照、身份证、银行账户等基本信息，并按指引完成账户验证
+          - listitem [ref=e138]:
+            - paragraph [ref=e139]: "2"
+            - paragraph [ref=e140]: 签署协议
+            - paragraph [ref=e141]: 微信支付团队会在1-2个工作日内完成审核，审核通过后请在线签约，即可体验各项产品能力
+          - listitem [ref=e144]:
+            - paragraph [ref=e145]: "3"
+            - paragraph [ref=e146]: 绑定场景
+            - paragraph [ref=e147]: 如需自行开发完成收款，需将商户号与APPID进行绑定，或开通微信收款商业版（免开发）完成收款
+      - link "接入微信支付" [ref=e150] [cursor=pointer]:
+        - /url: /index.php/apply/applyment_home/guide_normal
+  - generic [ref=e152]:
+    - generic [ref=e153]:
+      - generic [ref=e154]:
+        - term [ref=e155]: 关于我们
+        - definition [ref=e156]:
+          - link "关于微信支付" [ref=e157] [cursor=pointer]:
+            - /url: http://kf.qq.com/faq/181012y6bUNR181012nMFnMr.html
+        - definition [ref=e158]:
+          - link "平台使用协议" [ref=e159] [cursor=pointer]:
+            - /url: https://pay.weixin.qq.com/index.php/core/home/pay_pact_v4
+        - definition [ref=e160]:
+          - link "支付服务协议" [ref=e161] [cursor=pointer]:
+            - /url: https://pay.weixin.qq.com/index.php/public/apply_sign/protocol_v2
+        - definition [ref=e162]:
+          - link "联系我们" [ref=e163] [cursor=pointer]:
+            - /url: https://www.tencent.com/zh-cn/index.html
+      - generic [ref=e164]:
+        - term [ref=e165]: 服务支持
+        - definition [ref=e166]:
+          - link "开发文档（商户）" [ref=e167] [cursor=pointer]:
+            - /url: https://pay.weixin.qq.com/doc/v3/merchant/4012062524
+        - definition [ref=e168]:
+          - link "开发文档（合作伙伴）" [ref=e169] [cursor=pointer]:
+            - /url: https://pay.weixin.qq.com/doc/v3/partner/4012069852
+        - definition [ref=e170]:
+          - link "物料下载" [ref=e171] [cursor=pointer]:
+            - /url: https://pay.weixin.qq.com/material/brand.shtml
+      - generic [ref=e172]:
+        - term [ref=e173]: 友情链接
+        - definition [ref=e174]:
+          - link "微信开放平台" [ref=e175] [cursor=pointer]:
+            - /url: https://open.weixin.qq.com/
+        - definition [ref=e176]:
+          - link "微信公众平台" [ref=e177] [cursor=pointer]:
+            - /url: https://mp.weixin.qq.com/
+        - definition [ref=e178]:
+          - link "企业微信" [ref=e179] [cursor=pointer]:
+            - /url: https://work.weixin.qq.com/
+      - generic [ref=e180]:
+        - term [ref=e181]: 客服帮助
+        - definition [ref=e182]:
+          - link "自助服务专区" [ref=e183] [cursor=pointer]:
+            - /url: http://kf.qq.com/product/wechatpaymentmerchant.html
+        - definition [ref=e184]: 客服：95017-2
+        - definition [ref=e185]: （工作时间：09:00-22:00）
+      - generic [ref=e186]:
+        - term [ref=e187]: 关注微信支付商家助手公众号
+        - definition [ref=e188]
+    - generic [ref=e189]: Powered By Tencent & Tenpay Copyright 2005-2026 Tenpay All Rights Reserved.

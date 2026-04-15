@@ -1,0 +1,302 @@
+- generic [active] [ref=e1]:
+  - list [ref=e4]:
+    - listitem [ref=e5]:
+      - link "消息中心" [ref=e6] [cursor=pointer]:
+        - /url: /index.php/extend/cms/inner_message_list
+        - text: 消息中心
+    - listitem [ref=e8]:
+      - link "合作伙伴搜索" [ref=e9] [cursor=pointer]:
+        - /url: /index.php/partner/public/search
+        - text: 合作伙伴搜索
+    - listitem [ref=e11]:
+      - link "帮助中心" [ref=e12] [cursor=pointer]:
+        - /url: http://kf.qq.com/product/wechatpaymentmerchant.html
+        - text: 帮助中心
+    - listitem [ref=e14]:
+      - link "我的账号" [ref=e16] [cursor=pointer]:
+        - /url: javascript:;
+        - text: 我的账号
+  - generic [ref=e20]:
+    - heading "微信支付商户平台" [level=1] [ref=e22]:
+      - link "微信支付商户平台" [ref=e23] [cursor=pointer]:
+        - /url: /index.php/core/home
+    - generic [ref=e24]:
+      - list:
+        - listitem [ref=e25]:
+          - link "首页" [ref=e26] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=32103
+        - listitem [ref=e27]:
+          - link "交易中心" [ref=e28] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=14103
+        - listitem [ref=e29]:
+          - link "账户中心" [ref=e30] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=21500
+        - listitem [ref=e31]:
+          - link "营销中心" [ref=e32] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=18500
+        - listitem [ref=e33]:
+          - link "产品中心" [ref=e34] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=7505
+        - listitem [ref=e35]:
+          - link "数据中心" [ref=e36] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=76325
+  - generic [ref=e38]:
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - term [ref=e42]: 产品大全
+        - definition [ref=e43]:
+          - link "我的产品" [ref=e44] [cursor=pointer]:
+            - /url: /index.php/extend/product/lists?tid=3
+      - term [ref=e46]:
+        - link "开发配置" [ref=e47] [cursor=pointer]:
+          - /url: /index.php/extend/pay_setting
+      - term [ref=e49]:
+        - link "AppID账号管理" [ref=e50] [cursor=pointer]:
+          - /url: /index.php/extend/merchant_appid/mapay_platform/account_manage
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - heading "产品大全" [level=2] [ref=e53]
+        - generic [ref=e54]:
+          - link "全部(32)" [ref=e55] [cursor=pointer]:
+            - /url: "#none"
+          - link "未开通(22)" [ref=e56] [cursor=pointer]:
+            - /url: "#none"
+          - link "申请中(0)" [ref=e57] [cursor=pointer]:
+            - /url: "#none"
+          - link "已开通(9)" [ref=e58] [cursor=pointer]:
+            - /url: "#none"
+          - link "已关闭(1)" [ref=e59] [cursor=pointer]:
+            - /url: "#none"
+        - generic [ref=e60]:
+          - textbox "输入产品名称搜索" [ref=e61]
+          - link [ref=e62] [cursor=pointer]:
+            - /url: "javascript:"
+      - generic [ref=e63]:
+        - generic [ref=e64]:
+          - heading "增值功能" [level=3] [ref=e66]
+          - list [ref=e69]:
+            - listitem [ref=e70]:
+              - link "企业微信 企业内部支付及管理能力，如给员工发红包、报销付款等" [ref=e71] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=71&productType=0&category=0
+                - heading "企业微信" [level=4] [ref=e73]
+                - paragraph [ref=e74]: 企业内部支付及管理能力，如给员工发红包、报销付款等
+        - generic [ref=e75]:
+          - heading "支付产品" [level=3] [ref=e77]
+          - list [ref=e80]:
+            - listitem [ref=e81]:
+              - link "JSAPI支付 商户调用JSAPI接口，调起微信支付模块收款" [ref=e82] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=30&productType=0&category=1
+                - heading "JSAPI支付" [level=4] [ref=e84]
+                - paragraph [ref=e85]: 商户调用JSAPI接口，调起微信支付模块收款
+            - listitem [ref=e86]:
+              - link "APP支付 用户在APP中发起支付" [ref=e87] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=36&productType=0&category=1
+                - heading "APP支付" [level=4] [ref=e89]
+                - paragraph [ref=e90]: 用户在APP中发起支付
+            - listitem [ref=e91]:
+              - link "Native支付 商户系统按微信支付协议生成支付二维码，用户扫码支付" [ref=e92] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=38&productType=0&category=1
+                - heading "Native支付" [level=4] [ref=e94]
+                - paragraph [ref=e95]: 商户系统按微信支付协议生成支付二维码，用户扫码支付
+            - listitem [ref=e96]:
+              - link "付款码支付 用户打开微信钱包付款卡页面，商户扫码完成支付" [ref=e97] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=37&productType=0&category=1
+                - heading "付款码支付" [level=4] [ref=e99]
+                - paragraph [ref=e100]: 用户打开微信钱包付款卡页面，商户扫码完成支付
+            - listitem [ref=e101]:
+              - link "H5支付 在微信客户端外的移动端网页使用微信支付" [ref=e102] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=32&productType=0&category=1
+                - heading "H5支付" [level=4] [ref=e104]
+                - paragraph [ref=e105]: 在微信客户端外的移动端网页使用微信支付
+            - listitem [ref=e106]:
+              - link "刷脸支付 用户在支持微信刷脸支付的机器上，可以刷脸完成支付" [ref=e107] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=73&productType=0&category=1
+                - heading "刷脸支付" [level=4] [ref=e109]
+                - paragraph [ref=e110]: 用户在支持微信刷脸支付的机器上，可以刷脸完成支付
+            - listitem [ref=e111]:
+              - link "普通商户医保移动支付 支持线上医保结算，包括纯医保、纯自费、医保自费混合。" [ref=e112] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=212&productType=0&category=1
+                - heading "普通商户医保移动支付" [level=4] [ref=e114]
+                - paragraph [ref=e115]: 支持线上医保结算，包括纯医保、纯自费、医保自费混合。
+        - generic [ref=e116]:
+          - heading "运营工具" [level=3] [ref=e118]
+          - list [ref=e121]:
+            - listitem [ref=e122]:
+              - link "现金红包 用户领取红包后，金额直接进入微信支付钱包" [ref=e123] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=4&productType=0&category=2
+                - heading "现金红包" [level=4] [ref=e125]
+                - paragraph [ref=e126]: 用户领取红包后，金额直接进入微信支付钱包
+            - listitem [ref=e127]:
+              - link "预充值代金券 先领券再核销，优惠金额来自预充值的营销经费" [ref=e128] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=2&productType=0&category=2
+                - heading "预充值代金券" [level=4] [ref=e130]
+                - paragraph [ref=e131]: 先领券再核销，优惠金额来自预充值的营销经费
+            - listitem [ref=e132]:
+              - link "预充值立减与折扣 支付中直接减价，优惠金额来自商户预充值的营销经费" [ref=e133] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=3&productType=0&category=2
+                - heading "预充值立减与折扣" [level=4] [ref=e135]
+                - paragraph [ref=e136]: 支付中直接减价，优惠金额来自商户预充值的营销经费
+            - listitem [ref=e137]:
+              - link "企业付款到零钱 企业向个人付款，付款资金将直接进入用户微信零钱" [ref=e138] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=5&productType=0&category=2
+                - heading "企业付款到零钱" [level=4] [ref=e140]
+                - paragraph [ref=e141]: 企业向个人付款，付款资金将直接进入用户微信零钱
+            - listitem [ref=e142]:
+              - link "品牌 品牌是微信支付为「品牌商家」定制的行业解决方案" [ref=e143] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=116&productType=0&category=2
+                - heading "品牌" [level=4] [ref=e145]
+                - paragraph [ref=e146]: 品牌是微信支付为「品牌商家」定制的行业解决方案
+            - listitem [ref=e147]:
+              - link "免充值代金券 用户先领券再核销，优惠金额从商户订单实收中扣减" [ref=e148] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=47&productType=0&category=2
+                - heading "免充值代金券" [level=4] [ref=e150]
+                - paragraph [ref=e151]: 用户先领券再核销，优惠金额从商户订单实收中扣减
+            - listitem [ref=e152]:
+              - link "免充值立减与折扣 用户满足营销规则，支付中直接减价，优惠金额从商户订单实收中扣" [ref=e153] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=48&productType=0&category=2
+                - heading "免充值立减与折扣" [level=4] [ref=e155]
+                - paragraph [ref=e156]: 用户满足营销规则，支付中直接减价，优惠金额从商户订单实收中扣
+            - listitem [ref=e157]:
+              - link "小程序红包 商户发放红包，用户在小程序页面领取" [ref=e158] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=52&productType=0&category=2
+                - heading "小程序红包" [level=4] [ref=e160]
+                - paragraph [ref=e161]: 商户发放红包，用户在小程序页面领取
+            - listitem [ref=e162]:
+              - link "数据推送 商户可在移动端公众号收到经营数据的推送" [ref=e163] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=59&productType=0&category=2
+                - heading "数据推送" [level=4] [ref=e165]
+                - paragraph [ref=e166]: 商户可在移动端公众号收到经营数据的推送
+            - listitem [ref=e167]:
+              - link "电子发票 商户快速向用户开具电子发票，并插用户的微信卡包" [ref=e168] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=75&productType=0&category=2
+                - heading "电子发票" [level=4] [ref=e170]
+                - paragraph [ref=e171]: 商户快速向用户开具电子发票，并插用户的微信卡包
+            - listitem [ref=e172]:
+              - link "支付即服务 支付后为用户推送服务人员名片，搭建商家和用户连接的桥梁" [ref=e173] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=109&productType=0&category=2
+                - heading "支付即服务" [level=4] [ref=e175]
+                - paragraph [ref=e176]: 支付后为用户推送服务人员名片，搭建商家和用户连接的桥梁
+            - listitem [ref=e177]:
+              - link "品牌零售联合活动 品牌可以发布加价购等单品活动，大卖场/小商家可报名参与活动。" [ref=e178] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=134&productType=0&category=2
+                - heading "品牌零售联合活动" [level=4] [ref=e180]
+                - paragraph [ref=e181]: 品牌可以发布加价购等单品活动，大卖场/小商家可报名参与活动。
+            - listitem [ref=e182]:
+              - link "银行营销 微信支付为银行量身打造的一系列促活跃、增粘性的营销产品" [ref=e183] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=142&productType=0&category=2
+                - heading "银行营销" [level=4] [ref=e185]
+                - paragraph [ref=e186]: 微信支付为银行量身打造的一系列促活跃、增粘性的营销产品
+            - listitem [ref=e187]:
+              - link "行业券 该产品可创建指定行业券，支持用户在该行业报名商户消费时抵扣" [ref=e188] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=144&productType=0&category=2
+                - heading "行业券" [level=4] [ref=e190]
+                - paragraph [ref=e191]: 该产品可创建指定行业券，支持用户在该行业报名商户消费时抵扣
+            - listitem [ref=e192]:
+              - link "商家红包 商家红包，提供给商家的现金营销工具。" [ref=e193] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=187&productType=0&category=2
+                - heading "商家红包" [level=4] [ref=e195]
+                - paragraph [ref=e196]: 商家红包，提供给商家的现金营销工具。
+            - listitem [ref=e197]:
+              - link "商家转账 可通过该功能向微信用户进行转账" [ref=e198] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=185&productType=0&category=2
+                - heading "商家转账" [level=4] [ref=e200]
+                - paragraph [ref=e201]: 可通过该功能向微信用户进行转账
+        - generic [ref=e202]:
+          - heading "支付扩展工具" [level=3] [ref=e204]
+          - list [ref=e207]:
+            - listitem [ref=e208]:
+              - link "安全医生 为商户发起微信支付的网站提供安全诊断，出具修复建议" [ref=e209] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=27&productType=0&category=3
+                - heading "安全医生" [level=4] [ref=e211]
+                - paragraph [ref=e212]: 为商户发起微信支付的网站提供安全诊断，出具修复建议
+            - listitem [ref=e213]:
+              - link "分账 支持将交易款分发给多个微信支付商户或微信支付用户" [ref=e214] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=10&productType=0&category=3
+                - heading "分账" [level=4] [ref=e216]
+                - paragraph [ref=e217]: 支持将交易款分发给多个微信支付商户或微信支付用户
+            - listitem [ref=e218]:
+              - link "委托代扣 经用户授权，商户发送扣款指令，直接从用户账户中扣款。" [ref=e219] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=1&productType=0&category=3
+                - heading "委托代扣" [level=4] [ref=e221]
+                - paragraph [ref=e222]: 经用户授权，商户发送扣款指令，直接从用户账户中扣款。
+            - listitem [ref=e223]:
+              - link "自助清关 自助清关" [ref=e224] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=15&productType=0&category=3
+                - heading "自助清关" [level=4] [ref=e226]
+                - paragraph [ref=e227]: 自助清关
+            - listitem [ref=e228]:
+              - link "微信收款商业版 无需开发，通过手机轻松完成微信支付收款、对账等操作" [ref=e229] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=17&productType=0&category=3
+                - heading "微信收款商业版" [level=4] [ref=e231]
+                - paragraph [ref=e232]: 无需开发，通过手机轻松完成微信支付收款、对账等操作
+        - generic [ref=e233]:
+          - heading "资金解决方案" [level=3] [ref=e235]
+          - list [ref=e238]:
+            - listitem [ref=e239]:
+              - link "运营账户 将交易之外的其他运营资金管理单独管理" [ref=e240] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=8&productType=0&category=4
+                - heading "运营账户" [level=4] [ref=e242]
+                - paragraph [ref=e243]: 将交易之外的其他运营资金管理单独管理
+            - listitem [ref=e244]:
+              - link "自动提现 定期自动将交易款转至银行账户中" [ref=e245] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=6&productType=0&category=4
+                - heading "自动提现" [level=4] [ref=e247]
+                - paragraph [ref=e248]: 定期自动将交易款转至银行账户中
+            - listitem [ref=e249]:
+              - link "转账充值 商户通过网银转账的方式进行充值" [ref=e250] [cursor=pointer]:
+                - /url: /index.php/public/product/detail?pid=26&productType=0&category=4
+                - heading "转账充值" [level=4] [ref=e252]
+                - paragraph [ref=e253]: 商户通过网银转账的方式进行充值
+  - generic [ref=e255]:
+    - generic [ref=e256]:
+      - generic [ref=e257]:
+        - term [ref=e258]: 关于我们
+        - definition [ref=e259]:
+          - link "关于微信支付" [ref=e260] [cursor=pointer]:
+            - /url: http://kf.qq.com/faq/181012y6bUNR181012nMFnMr.html
+        - definition [ref=e261]:
+          - link "平台使用协议" [ref=e262] [cursor=pointer]:
+            - /url: /index.php/core/home/pay_pact_v4
+        - definition [ref=e263]:
+          - link "支付服务协议" [ref=e264] [cursor=pointer]:
+            - /url: /index.php/public/apply_sign/protocol_v2
+        - definition [ref=e265]:
+          - link "联系我们" [ref=e266] [cursor=pointer]:
+            - /url: https://www.tencent.com/zh-cn/index.html
+      - generic [ref=e267]:
+        - term [ref=e268]: 服务支持
+        - definition [ref=e269]:
+          - link "开发文档（商户）" [ref=e270] [cursor=pointer]:
+            - /url: /doc/v3/merchant/4012062524
+        - definition [ref=e271]:
+          - link "开发文档（合作伙伴）" [ref=e272] [cursor=pointer]:
+            - /url: /doc/v3/partner/4012069852
+        - definition [ref=e273]:
+          - link "物料下载" [ref=e274] [cursor=pointer]:
+            - /url: /static/material/brand.shtml
+      - generic [ref=e275]:
+        - term [ref=e276]: 友情链接
+        - definition [ref=e277]:
+          - link "微信开放平台" [ref=e278] [cursor=pointer]:
+            - /url: https://open.weixin.qq.com/
+        - definition [ref=e279]:
+          - link "微信公众平台" [ref=e280] [cursor=pointer]:
+            - /url: https://mp.weixin.qq.com/
+        - definition [ref=e281]:
+          - link "企业微信" [ref=e282] [cursor=pointer]:
+            - /url: https://work.weixin.qq.com/
+      - generic [ref=e283]:
+        - term [ref=e284]: 客服帮助
+        - definition [ref=e285]:
+          - link "自助服务专区" [ref=e286] [cursor=pointer]:
+            - /url: http://kf.qq.com/product/wechatpaymentmerchant.html
+        - definition [ref=e287]: 客服：95017-2
+        - definition [ref=e288]: （工作时间：09:00-22:00）
+    - generic [ref=e289]: Powered By Tencent & Tenpay Copyright 2005-2026 Tenpay All Rights Reserved.
+  - generic [ref=e291]:
+    - generic "移动版商户平台" [ref=e292] [cursor=pointer]
+    - generic "预约下载中心" [ref=e294] [cursor=pointer]
+    - generic "我要反馈" [ref=e296] [cursor=pointer]:
+      - link [ref=e297]:
+        - /url: javascript:;
+    - generic [ref=e300] [cursor=pointer]: 获取帮助

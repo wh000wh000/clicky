@@ -63,6 +63,9 @@ final class CursorInputPopupManager {
                 self?.dismissPopup()
             }
         )
+        // Inject the app's current locale so Text("key") calls resolve to the
+        // correct Localizable.xcstrings entry (same as CompanionPanelView).
+        .environment(\.locale, LocalizationManager.shared.currentLocale)
 
         let hostingView = NSHostingView(rootView: popupView)
         let fittingSize = hostingView.fittingSize

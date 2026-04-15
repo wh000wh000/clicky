@@ -1,0 +1,116 @@
+- generic [active] [ref=e1]:
+  - list [ref=e4]:
+    - listitem [ref=e5]:
+      - link "消息中心" [ref=e6] [cursor=pointer]:
+        - /url: /index.php/extend/cms/inner_message_list
+        - text: 消息中心
+    - listitem [ref=e8]:
+      - link "合作伙伴搜索" [ref=e9] [cursor=pointer]:
+        - /url: /index.php/partner/public/search
+        - text: 合作伙伴搜索
+    - listitem [ref=e11]:
+      - link "帮助中心" [ref=e12] [cursor=pointer]:
+        - /url: http://kf.qq.com/product/wechatpaymentmerchant.html
+        - text: 帮助中心
+    - listitem [ref=e14]:
+      - link "我的账号" [ref=e16] [cursor=pointer]:
+        - /url: javascript:;
+        - text: 我的账号
+  - generic [ref=e20]:
+    - heading "微信支付商户平台" [level=1] [ref=e22]:
+      - link "微信支付商户平台" [ref=e23] [cursor=pointer]:
+        - /url: /index.php/core/home
+    - generic [ref=e24]:
+      - list:
+        - listitem [ref=e25]:
+          - link "首页" [ref=e26] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=32103
+        - listitem [ref=e27]:
+          - link "交易中心" [ref=e28] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=14103
+        - listitem [ref=e29]:
+          - link "账户中心" [ref=e30] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=21500
+        - listitem [ref=e31]:
+          - link "营销中心" [ref=e32] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=18500
+        - listitem [ref=e33]:
+          - link "产品中心" [ref=e34] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=7505
+        - listitem [ref=e35]:
+          - link "数据中心" [ref=e36] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=76325
+  - generic [ref=e38]:
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - term [ref=e42]: 产品大全
+        - definition [ref=e43]:
+          - link "我的产品" [ref=e44] [cursor=pointer]:
+            - /url: /index.php/extend/product/lists?tid=3
+      - term [ref=e46]:
+        - link "开发配置" [ref=e47] [cursor=pointer]:
+          - /url: /index.php/extend/pay_setting
+      - term [ref=e49]:
+        - link "AppID账号管理" [ref=e50] [cursor=pointer]:
+          - /url: /index.php/extend/merchant_appid/mapay_platform/account_manage
+    - generic [ref=e53]:
+      - heading "AppID账号管理" [level=2] [ref=e55]
+      - generic [ref=e56]:
+        - generic [ref=e57]:
+          - tablist [ref=e61]:
+            - tab "我关联的AppID账号" [ref=e62]
+          - generic:     
+        - img [ref=e65]
+  - generic [ref=e68]:
+    - generic [ref=e69]:
+      - generic [ref=e70]:
+        - term [ref=e71]: 关于我们
+        - definition [ref=e72]:
+          - link "关于微信支付" [ref=e73] [cursor=pointer]:
+            - /url: http://kf.qq.com/faq/181012y6bUNR181012nMFnMr.html
+        - definition [ref=e74]:
+          - link "平台使用协议" [ref=e75] [cursor=pointer]:
+            - /url: /index.php/core/home/pay_pact_v4
+        - definition [ref=e76]:
+          - link "支付服务协议" [ref=e77] [cursor=pointer]:
+            - /url: /index.php/public/apply_sign/protocol_v2
+        - definition [ref=e78]:
+          - link "联系我们" [ref=e79] [cursor=pointer]:
+            - /url: https://www.tencent.com/zh-cn/index.html
+      - generic [ref=e80]:
+        - term [ref=e81]: 服务支持
+        - definition [ref=e82]:
+          - link "开发文档（商户）" [ref=e83] [cursor=pointer]:
+            - /url: /doc/v3/merchant/4012062524
+        - definition [ref=e84]:
+          - link "开发文档（合作伙伴）" [ref=e85] [cursor=pointer]:
+            - /url: /doc/v3/partner/4012069852
+        - definition [ref=e86]:
+          - link "物料下载" [ref=e87] [cursor=pointer]:
+            - /url: /static/material/brand.shtml
+      - generic [ref=e88]:
+        - term [ref=e89]: 友情链接
+        - definition [ref=e90]:
+          - link "微信开放平台" [ref=e91] [cursor=pointer]:
+            - /url: https://open.weixin.qq.com/
+        - definition [ref=e92]:
+          - link "微信公众平台" [ref=e93] [cursor=pointer]:
+            - /url: https://mp.weixin.qq.com/
+        - definition [ref=e94]:
+          - link "企业微信" [ref=e95] [cursor=pointer]:
+            - /url: https://work.weixin.qq.com/
+      - generic [ref=e96]:
+        - term [ref=e97]: 客服帮助
+        - definition [ref=e98]:
+          - link "自助服务专区" [ref=e99] [cursor=pointer]:
+            - /url: http://kf.qq.com/product/wechatpaymentmerchant.html
+        - definition [ref=e100]: 客服：95017-2
+        - definition [ref=e101]: （工作时间：09:00-22:00）
+    - generic [ref=e102]: Powered By Tencent & Tenpay Copyright 2005-2026 Tenpay All Rights Reserved.
+  - generic [ref=e104]:
+    - generic "移动版商户平台" [ref=e105] [cursor=pointer]
+    - generic "预约下载中心" [ref=e107] [cursor=pointer]
+    - generic "我要反馈" [ref=e109] [cursor=pointer]:
+      - link [ref=e110]:
+        - /url: javascript:;
+    - generic [ref=e113] [cursor=pointer]: 获取帮助

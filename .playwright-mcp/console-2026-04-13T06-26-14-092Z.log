@@ -1,0 +1,2 @@
+[     528ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/home/login?return_url=%2Findex.php%2Fcore%2Facc%2Flogin:0
+[   28908ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_CLOSED @ https://pingfore.qq.com/pingd?cc=-&ct=-&java=1&lang=-&pf=-&scl=-&scr=-&tt=-&tz=-8&vs=3.3&dm=any.qq.com&url=/search_children/wx.gtimg.com/core/404.html&rdm=pay.weixin.qq.com&rurl=/&arg=&flash=&pgv_pvid=3126628182&sds=0.018386644498420757:0

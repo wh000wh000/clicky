@@ -1667,20 +1667,20 @@ struct CompanionPanelView: View {
 
     private var statusText: String {
         if !companionManager.hasCompletedOnboarding || !companionManager.allPermissionsGranted {
-            return String(localized: "Setup")
+            return String(localized: "Setup", locale: appLocale)
         }
         if !companionManager.isOverlayVisible {
-            return String(localized: "Ready")
+            return String(localized: "Ready", locale: appLocale)
         }
         switch companionManager.voiceState {
         case .idle:
-            return String(localized: "Active")
+            return String(localized: "Active", locale: appLocale)
         case .listening:
-            return String(localized: "Listening")
+            return String(localized: "Listening", locale: appLocale)
         case .processing:
-            return String(localized: "Processing")
+            return String(localized: "Processing", locale: appLocale)
         case .responding:
-            return String(localized: "Responding")
+            return String(localized: "Responding", locale: appLocale)
         }
     }
 

@@ -165,16 +165,20 @@ struct BlueCursorView: View {
     // MARK: - Onboarding Video Layout
 
 
-    private let fullWelcomeMessage = String(localized: "hey! i'm clicky")
+    private var fullWelcomeMessage: String {
+        String(localized: "hey! i'm clicky", locale: appLocale)
+    }
 
-    private let navigationPointerPhrases = [
-        String(localized: "right here!"),
-        String(localized: "this one!"),
-        String(localized: "over here!"),
-        String(localized: "click this!"),
-        String(localized: "here it is!"),
-        String(localized: "found it!")
-    ]
+    private var navigationPointerPhrases: [String] {
+        [
+            String(localized: "right here!", locale: appLocale),
+            String(localized: "this one!", locale: appLocale),
+            String(localized: "over here!", locale: appLocale),
+            String(localized: "click this!", locale: appLocale),
+            String(localized: "here it is!", locale: appLocale),
+            String(localized: "found it!", locale: appLocale)
+        ]
+    }
 
     var body: some View {
         ZStack {
@@ -569,7 +573,7 @@ struct BlueCursorView: View {
         // if available, otherwise fall back to a random pointer phrase
         let pointerPhrase = companionManager.detectedElementBubbleText
             ?? navigationPointerPhrases.randomElement()
-            ?? String(localized: "right here!")
+            ?? String(localized: "right here!", locale: appLocale)
 
         streamNavigationBubbleCharacter(phrase: pointerPhrase, characterIndex: 0) {
             // All characters streamed — hold for 3 seconds, then fly back

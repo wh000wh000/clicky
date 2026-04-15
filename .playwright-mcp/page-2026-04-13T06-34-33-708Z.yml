@@ -1,0 +1,233 @@
+- generic [ref=e1]:
+  - list [ref=e4]:
+    - listitem [ref=e5]:
+      - link "消息中心" [ref=e6] [cursor=pointer]:
+        - /url: /index.php/extend/cms/inner_message_list
+        - text: 消息中心
+    - listitem [ref=e8]:
+      - link "合作伙伴搜索" [ref=e9] [cursor=pointer]:
+        - /url: /index.php/partner/public/search
+        - text: 合作伙伴搜索
+    - listitem [ref=e11]:
+      - link "帮助中心" [ref=e12] [cursor=pointer]:
+        - /url: http://kf.qq.com/product/wechatpaymentmerchant.html
+        - text: 帮助中心
+    - listitem [ref=e14]:
+      - link "我的账号" [ref=e16] [cursor=pointer]:
+        - /url: javascript:;
+        - text: 我的账号
+  - generic [ref=e20]:
+    - heading "微信支付商户平台" [level=1] [ref=e22]:
+      - link "微信支付商户平台" [ref=e23] [cursor=pointer]:
+        - /url: /index.php/core/home
+    - generic [ref=e24]:
+      - list:
+        - listitem [ref=e25]:
+          - link "首页" [ref=e26] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=32103
+        - listitem [ref=e27]:
+          - link "交易中心" [ref=e28] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=14103
+        - listitem [ref=e29]:
+          - link "账户中心" [ref=e30] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=21500
+        - listitem [ref=e31]:
+          - link "营销中心" [ref=e32] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=18500
+        - listitem [ref=e33]:
+          - link "产品中心" [ref=e34] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=7505
+        - listitem [ref=e35]:
+          - link "数据中心" [ref=e36] [cursor=pointer]:
+            - /url: /index.php/core/home/header?menu=76325
+  - generic [ref=e38]:
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - term [ref=e42]: 个人设置
+        - definition [ref=e43]:
+          - link "个人信息" [ref=e44] [cursor=pointer]:
+            - /url: /index.php/extend/employee
+        - definition [ref=e45]:
+          - link "待审核任务" [ref=e46] [cursor=pointer]:
+            - /url: /index.php/extend/audittask
+        - definition [ref=e47]:
+          - link "已审核任务" [ref=e48] [cursor=pointer]:
+            - /url: /index.php/extend/audittask/audit_processed
+        - definition [ref=e49]:
+          - link "我提交的审核任务" [ref=e50] [cursor=pointer]:
+            - /url: /index.php/extend/audittask/audit_submit
+      - term [ref=e52]:
+        - link "安全中心" [ref=e53] [cursor=pointer]:
+          - /url: /index.php/extend/securitymchcenter
+      - generic [ref=e54]:
+        - term [ref=e55]: 账户设置
+        - definition [ref=e56]:
+          - link "商户信息" [ref=e57] [cursor=pointer]:
+            - /url: /index.php/core/account/info
+        - definition [ref=e58]:
+          - link "银行结算账户" [ref=e59] [cursor=pointer]:
+            - /url: /xdc/mchsettlementinfoweb/index.php/xphp/csettlementinfo/settle_bank_acc_info
+        - definition [ref=e60]:
+          - link "发票信息" [ref=e61] [cursor=pointer]:
+            - /url: /index.php/extend/invoice
+        - definition [ref=e62]:
+          - link "经营场景管理" [ref=e63] [cursor=pointer]:
+            - /url: /extend/scene/mch_scene/manage
+        - definition [ref=e64]:
+          - link "API安全" [ref=e65] [cursor=pointer]:
+            - /url: /index.php/core/cert/api_cert
+        - definition [ref=e66]:
+          - link "审核配置" [ref=e67] [cursor=pointer]:
+            - /url: /index.php/extend/auditconfig
+        - definition [ref=e68]:
+          - link "微信群管理" [ref=e69] [cursor=pointer]:
+            - /url: /index.php/extend/chatroom/
+        - definition [ref=e70]:
+          - link "员工账号管理" [ref=e71] [cursor=pointer]:
+            - /url: /index.php/extend/staff_account
+        - definition [ref=e72]:
+          - link "微信商户终端" [ref=e73] [cursor=pointer]:
+            - /url: /index.php/core/account/device_manage
+        - definition [ref=e74]:
+          - link "微信支付物料管理" [ref=e75] [cursor=pointer]:
+            - /url: /xdc/iotmaterialmchxphp/index
+      - term [ref=e77]:
+        - link "微信收款商业版" [ref=e78] [cursor=pointer]:
+          - /url: /index.php/extend/mmpaymrqrpay
+      - term [ref=e80]:
+        - link "支付申请" [ref=e81] [cursor=pointer]:
+          - /url: /index.php/core/apply_progress
+      - term [ref=e83]:
+        - link "消费者投诉" [ref=e84] [cursor=pointer]:
+          - /url: /index.php/xphp/ccomplaints/complaints_info
+      - term [ref=e86]:
+        - link "违约记录" [ref=e87] [cursor=pointer]:
+          - /url: /index.php/xphp/cviolated_mch_handle/merchant_details_do
+    - generic [ref=e313]:
+      - heading "API安全" [level=2] [ref=e315]
+      - generic [ref=e316]:
+        - heading "验证商户身份" [level=3] [ref=e317]
+        - paragraph [ref=e318]: 商户调用API时签名使用
+        - generic [ref=e319]:
+          - generic [ref=e320]:
+            - generic [ref=e321]:
+              - generic [ref=e322]:
+                - generic [ref=e323]:
+                  - generic [ref=e324]: 商户API证书
+                  - generic [ref=e325]: 已失效
+                - generic [ref=e326]: 2026年01月13日失效
+              - paragraph [ref=e328]:
+                - text: 商户API证书用于证实商户身份，需妥善保管防止泄露：
+                - text: APIv2中，调用微信支付安全级别较高的接口；APIv3中，调用微信支付所有接口需使用
+            - generic [ref=e329]:
+              - button "申请证书" [active] [ref=e330] [cursor=pointer]
+              - button "查看指引" [ref=e331] [cursor=pointer]
+          - generic [ref=e332]:
+            - generic [ref=e333]:
+              - generic [ref=e335]:
+                - generic [ref=e336]: 商户APIv2密钥
+                - generic [ref=e337]: 已设置
+              - paragraph [ref=e339]: 调用APIv2时，需用APIv2密钥签名，从而界定你的身份，需妥善保管防止泄露 (APIv2密钥与APIv3密钥互不影响)
+            - generic [ref=e340]:
+              - button "修改" [ref=e341] [cursor=pointer]
+              - button "查看指引" [ref=e342] [cursor=pointer]
+      - generic [ref=e343]:
+        - heading "验证微信支付身份" [level=3] [ref=e344]
+        - paragraph [ref=e345]: 商户接收APIv3的请求应答、回调时验签使用
+        - generic [ref=e346]:
+          - generic [ref=e347]:
+            - generic [ref=e348]:
+              - generic [ref=e350]:
+                - generic [ref=e351]: 微信支付公钥
+                - generic [ref=e352]: 未启用
+              - paragraph [ref=e354]: 微信支付回调、应答商户时会使用微信支付私钥签名，商户需要使用微信支付公钥验签，用于验证微信支付的身份
+            - generic [ref=e355]:
+              - button "申请公钥" [ref=e357] [cursor=pointer]
+              - button "查看指引" [ref=e358] [cursor=pointer]
+          - generic [ref=e359]:
+            - generic [ref=e360]:
+              - generic [ref=e362]:
+                - generic [ref=e363]: 平台证书
+                - generic [ref=e364]: 已失效
+              - paragraph [ref=e366]: 请使用微信支付公钥，如遇使用问题，可联系微信支付技术支持进行帮助
+            - button "查看指引" [ref=e368] [cursor=pointer]
+      - generic [ref=e369]:
+        - heading "解密回调" [level=3] [ref=e370]
+        - paragraph [ref=e371]: 商户解密APIv3的回调通知使用
+        - generic [ref=e373]:
+          - generic [ref=e374]:
+            - generic [ref=e375]:
+              - generic [ref=e376]:
+                - generic [ref=e377]: APIv3密钥
+                - generic [ref=e378]: 已申请
+              - generic [ref=e379]: 2026年04月13日修改
+            - paragraph [ref=e381]: 调用APIv3的下载平台证书接口、处理回调通知中报文时，要通过该密钥来解密信息 (APIv3密钥与APIv2密钥互不影响)
+          - generic [ref=e382]:
+            - button "修改" [ref=e383] [cursor=pointer]
+            - button "查看指引" [ref=e384] [cursor=pointer]
+      - dialog "申请API证书" [ref=e386]:
+        - generic [ref=e387]: 申请API证书
+        - generic [ref=e389]:
+          - paragraph [ref=e390]: 调用安全级别较高的接口，需使用API证书验证身份。请先与贵司技术人员沟通以下事项：
+          - generic [ref=e391]: 1、确认技术人员已知悉需申请API证书；
+          - generic [ref=e392]:
+            - text: 2、添加员工为安全联系人，可同步接收相关通知及风险提醒。
+            - link "前往添加" [ref=e393] [cursor=pointer]:
+              - /url: /index.php/extend/securitycontact#/
+        - generic [ref=e395]:
+          - button "取消" [ref=e396] [cursor=pointer]
+          - button "确定" [ref=e397] [cursor=pointer]
+      - text:      
+  - generic [ref=e165]:
+    - generic [ref=e166]:
+      - generic [ref=e167]:
+        - term [ref=e168]: 关于我们
+        - definition [ref=e169]:
+          - link "关于微信支付" [ref=e170] [cursor=pointer]:
+            - /url: http://kf.qq.com/faq/181012y6bUNR181012nMFnMr.html
+        - definition [ref=e171]:
+          - link "平台使用协议" [ref=e172] [cursor=pointer]:
+            - /url: /index.php/core/home/pay_pact_v4
+        - definition [ref=e173]:
+          - link "支付服务协议" [ref=e174] [cursor=pointer]:
+            - /url: /index.php/public/apply_sign/protocol_v2
+        - definition [ref=e175]:
+          - link "联系我们" [ref=e176] [cursor=pointer]:
+            - /url: https://www.tencent.com/zh-cn/index.html
+      - generic [ref=e177]:
+        - term [ref=e178]: 服务支持
+        - definition [ref=e179]:
+          - link "开发文档（商户）" [ref=e180] [cursor=pointer]:
+            - /url: /doc/v3/merchant/4012062524
+        - definition [ref=e181]:
+          - link "开发文档（合作伙伴）" [ref=e182] [cursor=pointer]:
+            - /url: /doc/v3/partner/4012069852
+        - definition [ref=e183]:
+          - link "物料下载" [ref=e184] [cursor=pointer]:
+            - /url: /static/material/brand.shtml
+      - generic [ref=e185]:
+        - term [ref=e186]: 友情链接
+        - definition [ref=e187]:
+          - link "微信开放平台" [ref=e188] [cursor=pointer]:
+            - /url: https://open.weixin.qq.com/
+        - definition [ref=e189]:
+          - link "微信公众平台" [ref=e190] [cursor=pointer]:
+            - /url: https://mp.weixin.qq.com/
+        - definition [ref=e191]:
+          - link "企业微信" [ref=e192] [cursor=pointer]:
+            - /url: https://work.weixin.qq.com/
+      - generic [ref=e193]:
+        - term [ref=e194]: 客服帮助
+        - definition [ref=e195]:
+          - link "自助服务专区" [ref=e196] [cursor=pointer]:
+            - /url: http://kf.qq.com/product/wechatpaymentmerchant.html
+        - definition [ref=e197]: 客服：95017-2
+        - definition [ref=e198]: （工作时间：09:00-22:00）
+    - generic [ref=e199]: Powered By Tencent & Tenpay Copyright 2005-2026 Tenpay All Rights Reserved.
+  - generic [ref=e201]:
+    - generic "移动版商户平台" [ref=e202] [cursor=pointer]
+    - generic "预约下载中心" [ref=e204] [cursor=pointer]
+    - generic "我要反馈" [ref=e206] [cursor=pointer]:
+      - link [ref=e207]:
+        - /url: javascript:;
+    - generic [ref=e210] [cursor=pointer]: 获取帮助

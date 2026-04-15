@@ -1,0 +1,15 @@
+[     588ms] [ERROR] xmonitor-sdk 校验不通过: mode 请传入有效的环境标识字符串 beta 或 idc @ https://gtimg.wechatpay.cn/resource/xres/build/fe_monitor/xmonitor-sdk/v2.5.6/monitor.ie.min.js:0
+[  161706ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/api-password-v3:0
+[  161706ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/api-password-v3:0
+[  161706ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/api-password-v3:0
+[  161706ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/api-password-v3:0
+[  161706ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/api-password-v3:0
+[  161707ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/api-password-v3:0
+[  161707ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/api-password-v3:0
+[  874461ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/:0
+[  874462ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/:0
+[  874462ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/:0
+[  874462ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/:0
+[  874462ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/:0
+[  874462ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/:0
+[  874462ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://pay.weixin.qq.com/index.php/core/cert/api_cert#/:0

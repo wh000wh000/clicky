@@ -81,45 +81,45 @@ struct SceneContextDetector {
             // Code editors
             case "com.apple.dt.Xcode":
                 return [
-                    QuickActionPreset(label: String(localized: "Explain error"), iconName: "exclamationmark.triangle", promptText: "Look at the error or warning on my screen in Xcode. Explain what it means and how to fix it."),
-                    QuickActionPreset(label: String(localized: "Review code"), iconName: "eye", promptText: "Review the code visible on my screen. Point out any bugs, improvements, or best practices I should follow."),
+                    QuickActionPreset(id: "xcode-error", label: String(localized: "Explain error", locale: appLocale), iconName: "exclamationmark.triangle", promptText: "Look at the error or warning near my cursor in Xcode. Explain what it means and how to fix it."),
+                    QuickActionPreset(id: "xcode-review", label: String(localized: "Review code", locale: appLocale), iconName: "eye", promptText: "Review the code near my cursor on screen. Point out any bugs, improvements, or best practices I should follow."),
                 ]
             case "com.microsoft.VSCode", "com.microsoft.VSCodeInsiders":
                 return [
-                    QuickActionPreset(label: String(localized: "Explain error"), iconName: "exclamationmark.triangle", promptText: "Look at the error or warning on my screen in VS Code. Explain what it means and how to fix it."),
-                    QuickActionPreset(label: String(localized: "Review code"), iconName: "eye", promptText: "Review the code visible on my screen. Point out any bugs, improvements, or best practices I should follow."),
+                    QuickActionPreset(id: "vscode-error", label: String(localized: "Explain error", locale: appLocale), iconName: "exclamationmark.triangle", promptText: "Look at the error or warning near my cursor in VS Code. Explain what it means and how to fix it."),
+                    QuickActionPreset(id: "vscode-review", label: String(localized: "Review code", locale: appLocale), iconName: "eye", promptText: "Review the code near my cursor on screen. Point out any bugs, improvements, or best practices I should follow."),
                 ]
             // Browsers
             case "com.apple.Safari", "com.google.Chrome", "com.brave.Browser",
                  "org.mozilla.firefox", "com.microsoft.edgemac":
                 return [
-                    QuickActionPreset(label: String(localized: "Summarize page"), iconName: "doc.text", promptText: "Summarize the main content of the web page visible on my screen. Be concise but capture the key points."),
-                    QuickActionPreset(label: String(localized: "Explain this"), iconName: "questionmark.circle", promptText: "Explain what I'm looking at on this web page. What is the main content about?"),
+                    QuickActionPreset(id: "browser-summarize", label: String(localized: "Summarize page", locale: appLocale), iconName: "doc.text", promptText: "Summarize the main content of the web page visible on my screen. Be concise but capture the key points."),
+                    QuickActionPreset(id: "browser-explain", label: String(localized: "Explain this", locale: appLocale), iconName: "questionmark.circle", promptText: "Look at where my cursor is on this web page and explain what's there. Focus on the content near my cursor position."),
                 ]
             // Video editing
             case "com.adobe.premierepro", "com.apple.FinalCut":
                 return [
-                    QuickActionPreset(label: String(localized: "Edit suggestion"), iconName: "film", promptText: "Look at the video editing timeline on my screen. Suggest improvements to the current edit, transitions, or pacing."),
-                    QuickActionPreset(label: String(localized: "Color advice"), iconName: "paintpalette", promptText: "Look at the color grading or correction on my screen. Suggest improvements to make the footage look better."),
+                    QuickActionPreset(id: "video-edit", label: String(localized: "Edit suggestion", locale: appLocale), iconName: "film", promptText: "Look at the video editing timeline on my screen. Suggest improvements to the current edit, transitions, or pacing."),
+                    QuickActionPreset(id: "video-color", label: String(localized: "Color advice", locale: appLocale), iconName: "paintpalette", promptText: "Look at the color grading or correction on my screen. Suggest improvements to make the footage look better."),
                 ]
             // Design tools
             case "com.figma.Desktop", "com.bohemiancoding.sketch3":
                 return [
-                    QuickActionPreset(label: String(localized: "Design feedback"), iconName: "paintbrush", promptText: "Look at the design on my screen. Give feedback on layout, spacing, typography, and visual hierarchy."),
-                    QuickActionPreset(label: String(localized: "Accessibility check"), iconName: "accessibility", promptText: "Check the design on my screen for accessibility issues — contrast ratios, text size, touch targets, and color usage."),
+                    QuickActionPreset(id: "design-feedback", label: String(localized: "Design feedback", locale: appLocale), iconName: "paintbrush", promptText: "Look at the design on my screen. Give feedback on layout, spacing, typography, and visual hierarchy."),
+                    QuickActionPreset(id: "design-a11y", label: String(localized: "Accessibility check", locale: appLocale), iconName: "accessibility", promptText: "Check the design on my screen for accessibility issues — contrast ratios, text size, touch targets, and color usage."),
                 ]
             // Game engines
             case _ where bundleIdentifier.hasPrefix("com.unity3d"):
                 return [
-                    QuickActionPreset(label: String(localized: "Debug scene"), iconName: "ladybug", promptText: "Look at my Unity editor. Help me debug what's visible — check the scene, inspector, or console for issues."),
-                    QuickActionPreset(label: String(localized: "Optimize"), iconName: "bolt", promptText: "Look at my Unity scene and suggest performance optimizations based on what you can see."),
+                    QuickActionPreset(id: "unity-debug", label: String(localized: "Debug scene", locale: appLocale), iconName: "ladybug", promptText: "Look at my Unity editor. Help me debug what's visible — check the scene, inspector, or console for issues."),
+                    QuickActionPreset(id: "unity-optimize", label: String(localized: "Optimize", locale: appLocale), iconName: "bolt", promptText: "Look at my Unity scene and suggest performance optimizations based on what you can see."),
                 ]
             // Terminal
             case "com.apple.Terminal", "com.googlecode.iterm2", "dev.warp.Warp-Stable",
                  "io.alacritty", "com.mitchellh.ghostty":
                 return [
-                    QuickActionPreset(label: String(localized: "Explain output"), iconName: "terminal", promptText: "Explain the terminal output on my screen. What does it mean and what should I do next?"),
-                    QuickActionPreset(label: String(localized: "Fix command"), iconName: "wrench", promptText: "Look at the command or error in my terminal. Suggest the correct command or fix."),
+                    QuickActionPreset(id: "terminal-explain", label: String(localized: "Explain output", locale: appLocale), iconName: "terminal", promptText: "Explain the terminal output near my cursor. What does it mean and what should I do next?"),
+                    QuickActionPreset(id: "terminal-fix", label: String(localized: "Fix command", locale: appLocale), iconName: "wrench", promptText: "Look at the command or error near my cursor in the terminal. Suggest the correct command or fix."),
                 ]
             default:
                 return nil
