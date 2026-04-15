@@ -1,1 +1,0 @@
-[   43024ms] [ERROR] xmonitor-sdk 校验不通过: mode 请传入有效的环境标识字符串 beta 或 idc @ https://gtimg.wechatpay.cn/resource/xres/build/fe_monitor/xmonitor-sdk/v2.5.6/monitor.ie.min.js:0

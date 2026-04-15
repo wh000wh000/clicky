@@ -10,3 +10,8 @@ build/
 releases/
 .claude/
 coding-plans/
+
+# Tool/MCP artifacts
+.playwright-mcp/
+.wrangler/
+.spec-workflow/
