@@ -787,12 +787,82 @@ final class CompanionManager: ObservableObject {
     - user asks how to commit in xcode: "see that source control menu up top? click that and hit commit, or you can use command option c as a shortcut. [POINT:285,11:source control]"
     """
 
-    /// The effective system prompt, appending a language instruction so Claude always
-    /// responds in the language selected in General Settings.
+    /// The effective system prompt for the Claude/Anthropic path, appending a
+    /// language instruction so Claude responds in the language selected in settings.
     private var companionVoiceResponseSystemPrompt: String {
         let languageInstruction = LocalizationManager.shared.currentLanguage.claudeResponseLanguageInstruction
         return Self.companionVoiceResponseBaseSystemPrompt + "\n\nlanguage: \(languageInstruction)"
     }
+
+    // MARK: - OpenAI-Compatible Path (Qwen) — Tool Calling for Element Pointing
+
+    /// The system prompt shared preamble without the element-pointing section.
+    /// Both Claude and OpenAI paths share the same personality, rules, and
+    /// behavior — only the pointing mechanism differs.
+    private static let companionVoiceResponseSharedPreamble = """
+    you're clicky, a friendly always-on companion that lives in the user's menu bar. the user just spoke to you via push-to-talk and you can see their screen. your reply will be spoken aloud via text-to-speech AND displayed as text near the cursor. this is an ongoing conversation — you remember everything they've said before.
+
+    rules:
+    - default to one or two sentences. be direct and dense. BUT if the user asks you to explain more, go deeper, or elaborate, then go all out — give a thorough, detailed explanation with no length limit.
+    - all lowercase, casual, warm. no emojis.
+    - write naturally for speech — short sentences, no abbreviations or symbols that sound weird read aloud. write "for example" not "e.g.", spell out small numbers.
+    - since your response is also displayed as text, use paragraph breaks between distinct ideas so it's easy to scan visually. still no bullet points, lists, markdown, or formatting — just natural paragraphs.
+    - the screenshot label includes the cursor's pixel position. this tells you what area of the screen the user is focused on. when they ask you to explain or look at something, prioritize the content near their cursor — that's what they're looking at. describe the broader screen context only if it adds useful information.
+    - if the screenshot doesn't seem relevant to their question, just answer the question directly.
+    - you can help with anything — coding, writing, general knowledge, brainstorming.
+    - never say "simply" or "just".
+    - don't read out code verbatim. describe what the code does or what needs to change conversationally.
+    - focus on giving a thorough, useful explanation. don't end with simple yes/no questions like "want me to explain more?" or "should i show you?" — those are dead ends that force the user to just say yes.
+    - instead, when it fits naturally, end by planting a seed — mention something bigger or more ambitious they could try, a related concept that goes deeper, or a next-level technique that builds on what you just explained. make it something worth coming back for, not a question they'd just nod to. it's okay to not end with anything extra if the answer is complete on its own.
+    """
+
+    /// System prompt for the OpenAI-compatible (Qwen) path. Uses tool-calling
+    /// for element pointing instead of the [POINT:x,y:label] text tag format,
+    /// because Qwen models reliably output structured tool calls but do not
+    /// reliably follow custom inline tag formats.
+    private static let companionVoiceResponseBaseSystemPromptOpenAI = companionVoiceResponseSharedPreamble + """
+
+    element pointing:
+    you have a small blue triangle cursor that can fly to and point at things on screen. use it whenever pointing would genuinely help the user — finding a button, menu, or navigating an app. err on the side of pointing rather than not pointing.
+
+    don't point when it would be pointless — general knowledge questions, nothing to do with what's on screen, or pointing at something the user is already looking at.
+
+    to point, call the point_at_element tool with x and y coordinates (0–1000 normalized range, where 0,0 is top-left of the screenshot and 1000,1000 is bottom-right). you MUST also provide your spoken text response as normal text content alongside the tool call. never call the tool without also giving a text response.
+    """
+
+    /// The effective system prompt for the OpenAI-compatible (Qwen) path.
+    private var companionVoiceResponseSystemPromptOpenAI: String {
+        let languageInstruction = LocalizationManager.shared.currentLanguage.claudeResponseLanguageInstruction
+        return Self.companionVoiceResponseBaseSystemPromptOpenAI + "\n\nlanguage: \(languageInstruction)"
+    }
+
+    /// OpenAI-format tool definition for element pointing. Coordinates use
+    /// 0–1000 normalized space matching Qwen's computer-use training data.
+    private static let pointAtElementToolDefinition: [String: Any] = [
+        "type": "function",
+        "function": [
+            "name": "point_at_element",
+            "description": "Point the blue cursor triangle at a specific UI element visible in the screenshot. Call this when pointing would help the user find a button, menu, or navigate an app. Do NOT call if pointing would not add value.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "x": [
+                        "type": "integer",
+                        "description": "X coordinate of the element center, 0–1000 (0=left edge, 1000=right edge of screenshot)"
+                    ],
+                    "y": [
+                        "type": "integer",
+                        "description": "Y coordinate of the element center, 0–1000 (0=top edge, 1000=bottom edge of screenshot)"
+                    ],
+                    "label": [
+                        "type": "string",
+                        "description": "Short 1–3 word description of the UI element, e.g. 'save button' or 'search bar'"
+                    ]
+                ],
+                "required": ["x", "y", "label"]
+            ] as [String: Any]
+        ] as [String: Any]
+    ]
 
     // MARK: - AI Response Pipeline
 
@@ -848,9 +918,16 @@ final class CompanionManager: ObservableObject {
 
             do {
                 // Capture the user's current scene (frontmost app + window title)
-                // so Claude knows what app the user is working in.
+                // so the AI knows what app the user is working in.
                 let sceneContext = SceneContextDetector.captureCurrentSceneContext()
-                let systemPromptWithContext = companionVoiceResponseSystemPrompt + sceneContext.contextSummaryForSystemPrompt
+
+                // Select the appropriate system prompt: OpenAI path uses tool-
+                // calling for element pointing, Claude path uses [POINT:] tags.
+                let chatAPIFormat = APIConfiguration.shared.effectiveChatAPIFormat
+                let baseSystemPrompt = chatAPIFormat == .openaiCompatible
+                    ? companionVoiceResponseSystemPromptOpenAI
+                    : companionVoiceResponseSystemPrompt
+                let systemPromptWithContext = baseSystemPrompt + sceneContext.contextSummaryForSystemPrompt
 
                 // Capture all connected screens so the AI has full context
                 let screenCaptures = try await CompanionScreenCaptureUtility.captureAllScreensAsJPEG()
@@ -898,14 +975,16 @@ final class CompanionManager: ObservableObject {
                     responseOverlayManager.showOverlayAndBeginStreaming()
                 }
 
-                let fullResponseText: String
-                let chatAPIFormat = APIConfiguration.shared.effectiveChatAPIFormat
+                var fullResponseText: String
+                var qwenPointingToolCall: ParsedToolCall? = nil
+
                 if chatAPIFormat == .openaiCompatible {
-                    let (responseText, _) = try await openAICompatibleChatAPI.analyzeImageStreaming(
+                    let (responseText, toolCall, _) = try await openAICompatibleChatAPI.analyzeImageStreaming(
                         images: labeledImages,
                         systemPrompt: systemPromptWithContext,
                         conversationHistory: historyForAPI,
                         userPrompt: transcript,
+                        tools: [Self.pointAtElementToolDefinition],
                         bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
                             ? await SupabaseAuthManager.shared.validAccessToken()
                             : nil,
@@ -915,6 +994,7 @@ final class CompanionManager: ObservableObject {
                         }
                     )
                     fullResponseText = responseText
+                    qwenPointingToolCall = toolCall
                 } else {
                     let (responseText, _) = try await claudeAPI.analyzeImageStreaming(
                         images: labeledImages,
@@ -948,24 +1028,41 @@ final class CompanionManager: ObservableObject {
                     Task { await SupabaseAuthManager.shared.fetchUserProfile() }
                 }
 
-                // Parse the [POINT:...] tag from Claude's response
+                // --- Element Pointing ---
+                // Two pointing mechanisms depending on API path:
+                //   1. Qwen tool call → point_at_element with 0–1000 coordinates
+                //   2. Claude [POINT:x,y:label] text tag → pixel coordinates
+                // Qwen tool call takes priority; text tag is the fallback.
+
+                // Parse [POINT:...] tag (works for both paths — Claude always
+                // uses it, Qwen might occasionally emit it as fallback).
                 let parseResult = Self.parsePointingCoordinates(from: fullResponseText)
-                let spokenText = parseResult.spokenText
+                let spokenText: String
+
+                // If Qwen returned a tool call but no text content, use a
+                // minimal spoken phrase so TTS does not go completely silent.
+                if fullResponseText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   let toolCall = qwenPointingToolCall,
+                   toolCall.name == "point_at_element" {
+                    // Parse the label from tool call args for a contextual fallback
+                    let fallbackLabel: String = {
+                        guard let argsData = toolCall.argumentsJSON.data(using: .utf8),
+                              let args = try? JSONSerialization.jsonObject(with: argsData) as? [String: Any],
+                              let label = args["label"] as? String, !label.isEmpty
+                        else { return "here" }
+                        return label
+                    }()
+                    fullResponseText = "right there, the \(fallbackLabel)"
+                    spokenText = fullResponseText
+                } else {
+                    spokenText = parseResult.spokenText
+                }
 
                 // Update the overlay with the clean text (POINT tag stripped)
                 responseOverlayManager.updateStreamingText(spokenText)
 
-                // Handle element pointing if Claude returned coordinates.
-                // Switch to idle BEFORE setting the location so the triangle
-                // becomes visible and can fly to the target. Without this, the
-                // spinner hides the triangle and the flight animation is invisible.
-                let hasPointCoordinate = parseResult.coordinate != nil
-                if hasPointCoordinate {
-                    voiceState = .idle
-                }
-
-                // Pick the screen capture matching Claude's screen number,
-                // falling back to the cursor screen if not specified.
+                // Pick the target screen — cursor screen by default, or the
+                // screen number specified in a [POINT:] tag.
                 let targetScreenCapture: CompanionScreenCapture? = {
                     if let screenNumber = parseResult.screenNumber,
                        screenNumber >= 1 && screenNumber <= effectiveCaptures.count {
@@ -974,7 +1071,73 @@ final class CompanionManager: ObservableObject {
                     return effectiveCaptures.first(where: { $0.isCursorScreen })
                 }()
 
-                if let pointCoordinate = parseResult.coordinate,
+                // Try Qwen tool call pointing first (0–1000 normalized space)
+                var didHandlePointing = false
+
+                if let toolCall = qwenPointingToolCall,
+                   toolCall.name == "point_at_element",
+                   let argsData = toolCall.argumentsJSON.data(using: .utf8),
+                   let args = try? JSONSerialization.jsonObject(with: argsData) as? [String: Any],
+                   let x1000 = (args["x"] as? Int) ?? (args["x"] as? Double).map({ Int($0) }),
+                   let y1000 = (args["y"] as? Int) ?? (args["y"] as? Double).map({ Int($0) }),
+                   let targetScreenCapture {
+
+                    let elementLabel = args["label"] as? String
+                    let displayWidth = CGFloat(targetScreenCapture.displayWidthInPoints)
+                    let displayHeight = CGFloat(targetScreenCapture.displayHeightInPoints)
+                    let displayFrame = targetScreenCapture.displayFrame
+
+                    // Clamp to 0–1000 range
+                    let clampedX = max(0, min(x1000, 1000))
+                    let clampedY = max(0, min(y1000, 1000))
+
+                    // Convert 0–1000 normalized → display points (top-left origin)
+                    let displayLocalX = (Double(clampedX) / 1000.0) * Double(displayWidth)
+                    let displayLocalYTopLeft = (Double(clampedY) / 1000.0) * Double(displayHeight)
+
+                    // Top-left → AppKit bottom-left origin
+                    let appKitLocalY = Double(displayHeight) - displayLocalYTopLeft
+
+                    let globalLocation = CGPoint(
+                        x: displayLocalX + Double(displayFrame.origin.x),
+                        y: appKitLocalY + Double(displayFrame.origin.y)
+                    )
+
+                    // Switch to idle so the triangle becomes visible before flying
+                    voiceState = .idle
+                    detectedElementScreenLocation = globalLocation
+                    detectedElementDisplayFrame = displayFrame
+
+                    // Optional background refinement via ElementLocationDetector
+                    if let detector = elementLocationDetector,
+                       let label = elementLabel, !label.isEmpty {
+                        let capturedDisplayFrame = displayFrame
+                        let capturedScreenCapture = targetScreenCapture
+                        Task {
+                            print("🔧 Qwen pointing: running precise detection for \"\(label)\"...")
+                            if let refinedDisplayLocalCoordinate = await detector.detectElementLocation(
+                                screenshotData: capturedScreenCapture.imageData,
+                                elementQuery: label,
+                                displayWidthInPoints: capturedScreenCapture.displayWidthInPoints,
+                                displayHeightInPoints: capturedScreenCapture.displayHeightInPoints
+                            ) {
+                                let refinedGlobalLocation = CGPoint(
+                                    x: refinedDisplayLocalCoordinate.x + capturedDisplayFrame.origin.x,
+                                    y: refinedDisplayLocalCoordinate.y + capturedDisplayFrame.origin.y
+                                )
+                                self.detectedElementScreenLocation = refinedGlobalLocation
+                                print("🔧 Qwen pointing: refined (\(Int(globalLocation.x)), \(Int(globalLocation.y))) → (\(Int(refinedGlobalLocation.x)), \(Int(refinedGlobalLocation.y)))")
+                            }
+                        }
+                    }
+
+                    ClickyAnalytics.trackElementPointed(elementLabel: elementLabel)
+                    print("🔧 Qwen tool pointing: (\(x1000), \(y1000))/1000 → global AppKit (\(Int(globalLocation.x)), \(Int(globalLocation.y))) label=\"\(elementLabel ?? "element")\"")
+                    didHandlePointing = true
+                }
+
+                // Fallback: Claude [POINT:x,y:label] text tag (pixel space)
+                if !didHandlePointing, let pointCoordinate = parseResult.coordinate,
                    let targetScreenCapture {
                     // Claude's coordinates are in the screenshot's pixel space
                     // (top-left origin, e.g. 1280x831). Scale to the display's
@@ -985,32 +1148,23 @@ final class CompanionManager: ObservableObject {
                     let displayHeight = CGFloat(targetScreenCapture.displayHeightInPoints)
                     let displayFrame = targetScreenCapture.displayFrame
 
-                    // Clamp to screenshot coordinate space
                     let clampedX = max(0, min(pointCoordinate.x, screenshotWidth))
                     let clampedY = max(0, min(pointCoordinate.y, screenshotHeight))
 
-                    // Scale from screenshot pixels to display points
                     let displayLocalX = clampedX * (displayWidth / screenshotWidth)
                     let displayLocalY = clampedY * (displayHeight / screenshotHeight)
 
-                    // Convert from top-left origin (screenshot) to bottom-left origin (AppKit)
                     let appKitY = displayHeight - displayLocalY
 
-                    // Claude's rough estimate in global AppKit coordinates
                     let claudeGlobalLocation = CGPoint(
                         x: displayLocalX + displayFrame.origin.x,
                         y: appKitY + displayFrame.origin.y
                     )
 
-                    // Use Claude's rough estimate immediately so the cursor
-                    // starts flying while the precise detector runs in parallel.
+                    voiceState = .idle
                     detectedElementScreenLocation = claudeGlobalLocation
                     detectedElementDisplayFrame = displayFrame
 
-                    // If an element location detector is configured (e.g. UI-TARS),
-                    // refine the coordinate in the background. The detector's result
-                    // updates the location after the cursor has already started its
-                    // flight, so there's no added latency to the TTS pipeline.
                     if let detector = elementLocationDetector,
                        let elementLabel = parseResult.elementLabel,
                        !elementLabel.isEmpty {
@@ -1037,8 +1191,11 @@ final class CompanionManager: ObservableObject {
                     }
                     ClickyAnalytics.trackElementPointed(elementLabel: parseResult.elementLabel)
                     print("🎯 Element pointing: (\(Int(pointCoordinate.x)), \(Int(pointCoordinate.y))) → \"\(parseResult.elementLabel ?? "element")\"")
-                } else {
-                    print("🎯 Element pointing: \(parseResult.elementLabel ?? "no element")")
+                    didHandlePointing = true
+                }
+
+                if !didHandlePointing {
+                    print("🎯 Element pointing: none")
                 }
 
                 // Save this exchange to conversation history (with the point tag

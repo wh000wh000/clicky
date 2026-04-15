@@ -21,6 +21,13 @@ struct ChatQuotaExceededError: LocalizedError {
     var errorDescription: String? { message }
 }
 
+/// A tool_call parsed from the model's streaming response. Contains the
+/// function name and the raw JSON arguments string for caller-side decoding.
+struct ParsedToolCall {
+    let name: String
+    let argumentsJSON: String
+}
+
 class OpenAICompatibleChatAPI {
     private let apiURL: URL
     var model: String
@@ -60,17 +67,25 @@ class OpenAICompatibleChatAPI {
 
     /// Analyzes images with streaming, matching ClaudeAPI's method signature
     /// so CompanionManager can call either interchangeably.
+    ///
+    /// When `tools` is provided, the model may respond with tool_calls instead
+    /// of (or alongside) text content. The SSE parser accumulates tool_call
+    /// deltas and returns the first parsed tool call in the result tuple.
     func analyzeImageStreaming(
         images: [(data: Data, label: String)],
         systemPrompt: String,
         conversationHistory: [(userPlaceholder: String, assistantResponse: String)] = [],
         userPrompt: String,
+        // OpenAI-format tool definitions. When non-nil, injected into the
+        // request body so the model can optionally call tools alongside its
+        // text response. Used for element pointing with Qwen models.
+        tools: [[String: Any]]? = nil,
         // Pass the Supabase JWT when using the proxy Worker with auth enabled.
         // In proxy mode the Worker verifies the JWT and adds the real API key
         // server-side, so the bearer token replaces the API key in the header.
         bearerToken: String? = nil,
         onTextChunk: @MainActor @Sendable (String) -> Void
-    ) async throws -> (text: String, duration: TimeInterval) {
+    ) async throws -> (text: String, toolCall: ParsedToolCall?, duration: TimeInterval) {
         let startTime = Date()
 
         var request = URLRequest(url: apiURL)
@@ -138,12 +153,19 @@ class OpenAICompatibleChatAPI {
             "content": userContentBlocks
         ])
 
-        let requestBody: [String: Any] = [
+        var requestBody: [String: Any] = [
             "model": model,
             "messages": messages,
             "max_tokens": 1024,
             "stream": true
         ]
+
+        // Inject tool definitions so the model can optionally call tools
+        // (e.g. point_at_element for cursor pointing with Qwen models).
+        if let tools, !tools.isEmpty {
+            requestBody["tools"] = tools
+            requestBody["tool_choice"] = "auto"
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
@@ -186,6 +208,13 @@ class OpenAICompatibleChatAPI {
 
         var fullText = ""
 
+        // Tool call accumulation state. OpenAI streams tool_calls as
+        // incremental deltas across multiple SSE chunks — we concatenate
+        // the argument fragments here and parse the JSON once at the end.
+        var toolCallName = ""
+        var toolCallArgumentsBuffer = ""
+        var hasSeenToolCall = false
+
         for try await line in bytes.lines {
             try Task.checkCancellation()
 
@@ -198,18 +227,48 @@ class OpenAICompatibleChatAPI {
                   let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                   let choices = json["choices"] as? [[String: Any]],
                   let firstChoice = choices.first,
-                  let delta = firstChoice["delta"] as? [String: Any],
-                  let content = delta["content"] as? String else {
+                  let delta = firstChoice["delta"] as? [String: Any] else {
                 continue
             }
 
-            fullText += content
-            await onTextChunk(fullText)
+            // Text content delta — accumulate and stream to caller
+            if let content = delta["content"] as? String {
+                fullText += content
+                await onTextChunk(fullText)
+            }
+
+            // Tool call delta — accumulate function name and arguments.
+            // A single delta may contain both content and tool_calls (though
+            // Qwen typically sends one or the other), so these are independent
+            // if-branches rather than if-else.
+            if let toolCallsDeltas = delta["tool_calls"] as? [[String: Any]] {
+                hasSeenToolCall = true
+                for toolDelta in toolCallsDeltas {
+                    if let functionDelta = toolDelta["function"] as? [String: Any] {
+                        if let name = functionDelta["name"] as? String, !name.isEmpty {
+                            toolCallName = name
+                        }
+                        if let argumentsChunk = functionDelta["arguments"] as? String {
+                            toolCallArgumentsBuffer += argumentsChunk
+                        }
+                    }
+                }
+            }
+        }
+
+        // Build the parsed tool call from accumulated fragments (if any).
+        var parsedToolCall: ParsedToolCall? = nil
+        if hasSeenToolCall && !toolCallName.isEmpty && !toolCallArgumentsBuffer.isEmpty {
+            parsedToolCall = ParsedToolCall(
+                name: toolCallName,
+                argumentsJSON: toolCallArgumentsBuffer
+            )
+            print("🔧 Tool call received: \(toolCallName)(\(toolCallArgumentsBuffer.prefix(120)))")
         }
 
         let duration = Date().timeIntervalSince(startTime)
-        print("📥 OpenAI-compatible API response: \(fullText.count) chars in \(String(format: "%.1f", duration))s")
+        print("📥 OpenAI-compatible API response: \(fullText.count) chars, toolCall=\(parsedToolCall != nil) in \(String(format: "%.1f", duration))s")
 
-        return (text: fullText, duration: duration)
+        return (text: fullText, toolCall: parsedToolCall, duration: duration)
     }
 }

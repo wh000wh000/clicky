@@ -1,7 +1,7 @@
 # Clicky 商业化路线图
 
-> 最后更新：2026-04-13
-> 状态：Phase 1 已完成 — Auth + Worker 改造已上线，等待 Xcode 端到端验证
+> 最后更新：2026-04-15
+> 状态：Phase 1-3 代码完成，Supabase 迁移已执行，Worker 已部署。Qwen 元素指向（tool calling）已实现，待端到端验证。
 
 ---
 
@@ -24,10 +24,10 @@
 | Phase 0.5: SiliconFlow 模型替换 | ✅ 已完成 | 客户端可配置 API 层 + Qwen 3.5 Preset |
 | Phase 1a: Supabase Auth 集成 | ✅ 已完成 | Swift 端认证 + Worker JWT 验证 + 邮件确认流程 |
 | Phase 1b: Worker 改造为 SiliconFlow 代理 | ✅ 已完成 | 提交 `fa70d6a`，已部署，国际站 api.siliconflow.com |
-| Phase 2: 邀请码准入 | ⬜ 未开始 | 注册后邀请码验证门槛 |
-| Phase 3: 用量计量与限额 | ⬜ 未开始 | API 调用计数 + 每日限额 |
-| Phase 4: 套餐与支付 | ⬜ 未开始 | RevenueCat / Apple IAP |
-| Phase 5: 用户中心 | ⬜ 未开始 | 个人资料、用量仪表盘、邀请管理 |
+| Phase 2: 邀请码准入 | ✅ 代码完成 | Swift 端 + Worker + UI 已实现，待 Supabase 迁移执行 + 端到端验证 |
+| Phase 3: 用量计量与限额 | ✅ 代码完成 | Worker 限额（已改为原子 RPC）+ 客户端用量展示，待 Supabase 迁移执行 + 端到端验证 |
+| Phase 4: 套餐与支付 | 🔶 部分完成 | 微信支付已实现（QR 码 + 轮询），Stripe 代码保留但未启用，Schema 迁移 02 已写（Stripe 列） |
+| Phase 5: 用户中心 | ✅ 代码完成 | UserCenterView 已实现：套餐展示、用量统计、邀请码管理、微信支付升级流程 |
 
 ---
 
@@ -138,76 +138,94 @@ DEFAULT_TTS_VOICE = "FunAudioLLM/CosyVoice2-0.5B:alex"
 
 ---
 
-## Phase 2: 邀请码准入
+## Phase 2: 邀请码准入 ✅
 
-> 依赖：Phase 1 完成
+> 依赖：Phase 1 完成 — **代码已完成，待执行 Supabase 迁移 + 端到端验证**
 
 ### 2.1 注册后邀请码验证
 
-- [ ] 新用户首次登录后，检查是否已通过邀请码验证
-- [ ] 未验证用户进入邀请码输入界面（不能使用 app 功能）
-- [ ] 调用 `use_invitation_code()` RPC 验证码
-- [ ] 验证成功后解锁 app 功能
+- [x] 新用户首次登录后，检查是否已通过邀请码验证（`isInvitationGated` in `CompanionPanelView`）
+- [x] 未验证用户进入邀请码输入界面（`invitationCodeEntrySection`）
+- [x] 调用 `use_invitation_code()` RPC 验证码（`SupabaseAuthManager.useInvitationCode()`）
+- [x] 验证成功后解锁 app 功能（`invitationVerified` 自动刷新）
 
 ### 2.2 邀请码输入 UI
 
-- [ ] 在 CompanionPanelView 中添加邀请码输入界面
-- [ ] 8 位大写字母/数字输入框
-- [ ] 实时验证反馈（成功/失败/已过期/已用完）
-- [ ] 成功后动画过渡到主界面
+- [x] 在 CompanionPanelView 中添加邀请码输入界面
+- [x] 8 位大写字母/数字输入框
+- [x] 实时验证反馈（成功/失败/已过期/已用完）
+- [x] 成功后自动过渡到主界面
 
 ### 2.3 用户邀请码分享
 
-- [ ] 在面板中显示当前用户的个人邀请码
-- [ ] 一键复制邀请码
-- [ ] 显示已邀请人数（`invited_count`）
+- [x] 在面板中显示当前用户的个人邀请码（`signedInRow` + `UserCenterView.inviteSection`）
+- [x] 一键复制邀请码
+- [x] 显示已邀请人数（`invited_count`）
+
+### 待执行
+
+- [ ] 在 Supabase 执行 `schema_migration_01.sql`（添加 `invitation_verified` 列 + 更新 RPC）
+- [ ] 在 Supabase 执行 `schema_migration_03.sql`（100 个一次性邀请码种子数据）
+- [ ] 端到端验证
 
 ### 技术决策
 
 - **为什么需要邀请码**: 控制早期用户增长，避免 API 成本失控
 - **验证时机**: 注册后首次使用时验证，不阻断注册流程本身
+- **大小写不敏感**: RPC 自动 `upper()` 输入码，用户不需要手动切大写
 
 ---
 
-## Phase 3: 用量计量与限额
+## Phase 3: 用量计量与限额 ✅
 
-> 依赖：Phase 1 完成
+> 依赖：Phase 1 完成 — **代码已完成，待执行 Supabase 迁移 + 端到端验证**
 
 ### 3.1 Worker 端用量记录
 
-- [ ] `/chat` 路由：解析响应中的 `usage` 字段（prompt_tokens, completion_tokens）
-- [ ] 每次成功调用写入 `api_usage_logs` 表
-- [ ] Worker 需要 Supabase service_role key 写入日志
+- [x] `/chat` 路由：解析响应中的 `usage` 字段（`recordChatUsage()` via `ctx.waitUntil()`）
+- [x] 每次成功调用写入 `api_usage_logs` 表
+- [x] Worker 使用 Supabase `service_role` key 写入日志
 
 ### 3.2 每日限额检查
 
-- [ ] `/chat` 路由前置检查：查询 `user_profiles.daily_chat_count`
-- [ ] 超过 `plans.daily_chat_limit` 时返回 429 + 剩余额度信息
-- [ ] 每日重置逻辑：检查 `daily_chat_reset_at`，跨天时重置计数
-- [ ] 计数原子递增（避免并发问题）
+- [x] `/chat` 路由前置检查：`checkAndIncrementChatQuota()`
+- [x] 超过 `plans.daily_chat_limit` 时返回 429 + 剩余额度信息
+- [x] 每日重置逻辑：跨天时自动重置计数
+- [x] 计数原子递增（`check_and_increment_chat_quota` RPC，`SELECT ... FOR UPDATE` 防竞态）
 
 ### 3.3 客户端用量展示
 
-- [ ] CompanionPanelView 显示今日已用/剩余次数
-- [ ] 接近限额时黄色警告提示
-- [ ] 达到限额时显示升级引导
-- [ ] 429 响应的优雅处理和 UI 反馈
+- [x] CompanionPanelView 显示今日已用/剩余次数（进度条）
+- [x] 接近限额时警告提示
+- [x] 达到限额时显示升级引导（`planUpgradeSection`）
+- [x] 429 响应的 UI 反馈
+
+### 待执行
+
+- [ ] 在 Supabase 执行 `schema_migration_04.sql`（原子限额 RPC）
+- [ ] 重新 deploy Worker（`npx wrangler deploy`）
+- [ ] 端到端验证
 
 ### 技术决策
 
 - **为什么 Worker 端计量**: 客户端不可信，所有计量必须在服务端
 - **动态重置 vs Cron**: 优先用动态检查（读时重置），减少基础设施依赖
+- **原子 RPC vs REST read-then-write**: 使用 `SELECT ... FOR UPDATE` 行锁防止并发请求绕过限额
 
 ---
 
-## Phase 4: 套餐与支付
+## Phase 4: 套餐与支付 🔶
 
 > 依赖：Phase 3 完成
 
+> 部分完成 — 微信支付已实现，Stripe 代码保留，Apple IAP 未开始
+
 ### 4.1 支付方案选型
 
-- [ ] 评估 RevenueCat vs 直接 StoreKit 2
-- [ ] **初步方案：RevenueCat**（降低开发成本）
+- [x] 微信支付 Native（QR 码扫码 + 轮询确认，`WeChatPayClient` + Worker 路由）
+- [x] Stripe Checkout（代码保留在 `StripeCheckoutClient.swift`，Worker 路由已注释）
+- [x] Schema 迁移 02 已写（`stripe_customer_id` / `stripe_subscription_id` 列）
+- [ ] 评估 RevenueCat vs 直接 StoreKit 2（Apple IAP）
 
 ### 4.2 Apple IAP 商品配置
 
@@ -231,15 +249,17 @@ DEFAULT_TTS_VOICE = "FunAudioLLM/CosyVoice2-0.5B:alex"
 
 ---
 
-## Phase 5: 用户中心与仪表盘
+## Phase 5: 用户中心与仪表盘 ✅
 
-> 依赖：Phase 1-3 完成
+> 依赖：Phase 1-3 完成 — **核心功能已实现**
 
-- [ ] 个人资料设置（display_name、avatar）
-- [ ] 当前套餐 + 过期时间
-- [ ] 用量统计（今日/本周/本月）
-- [ ] 邀请码管理 + 一键复制
-- [ ] 模型/语音/快捷键偏好设置
+- [x] 当前套餐 + plan 标签展示（`UserCenterView`）
+- [x] 用量统计 — 今日对话数 / 限额进度条（免费用户 + 付费用户）
+- [x] 邀请码管理 + 一键复制 + 已邀请人数
+- [x] 微信支付升级流程（QR 码生成 + 3 秒轮询 + 成功状态）
+- [ ] 个人资料设置（display_name、avatar）— 未实现
+- [ ] 用量统计扩展（本周/本月维度）— 未实现
+- [ ] 模型/语音/快捷键偏好设置 — 部分在 GeneralSettingsView / APISettingsView
 
 ---
 
