@@ -84,7 +84,9 @@ final class CompanionResponseOverlayManager {
             defer: false
         )
 
-        responseOverlayPanel.level = .statusBar
+        // Must be above OverlayWindow (.screenSaver = 1000) so the response
+        // text is visible on top of the full-screen cursor overlay.
+        responseOverlayPanel.level = NSWindow.Level(Int(CGWindowLevelForKey(.screenSaverWindow)) + 1)
         responseOverlayPanel.isOpaque = false
         responseOverlayPanel.backgroundColor = .clear
         responseOverlayPanel.hasShadow = false

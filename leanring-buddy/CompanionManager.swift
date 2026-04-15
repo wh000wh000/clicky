@@ -894,7 +894,6 @@ final class CompanionManager: ObservableObject {
                 // Use the appropriate chat API based on configured format.
                 // Show the response text overlay so the user can read along
                 // while TTS audio plays (only if the user has enabled it).
-                var accumulatedStreamingText = ""
                 if isResponseTextOverlayEnabled {
                     responseOverlayManager.showOverlayAndBeginStreaming()
                 }
@@ -910,9 +909,9 @@ final class CompanionManager: ObservableObject {
                         bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
                             ? await SupabaseAuthManager.shared.validAccessToken()
                             : nil,
-                        onTextChunk: { [weak self] chunk in
-                            accumulatedStreamingText += chunk
-                            self?.responseOverlayManager.updateStreamingText(accumulatedStreamingText)
+                        onTextChunk: { [weak self] accumulatedText in
+                            // onTextChunk passes the full accumulated text so far, not a delta
+                            self?.responseOverlayManager.updateStreamingText(accumulatedText)
                         }
                     )
                     fullResponseText = responseText
@@ -925,9 +924,9 @@ final class CompanionManager: ObservableObject {
                         bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
                             ? SupabaseAuthManager.shared.currentSession?.accessToken
                             : nil,
-                        onTextChunk: { [weak self] chunk in
-                            accumulatedStreamingText += chunk
-                            self?.responseOverlayManager.updateStreamingText(accumulatedStreamingText)
+                        onTextChunk: { [weak self] accumulatedText in
+                            // onTextChunk passes the full accumulated text so far, not a delta
+                            self?.responseOverlayManager.updateStreamingText(accumulatedText)
                         }
                     )
                     fullResponseText = responseText
