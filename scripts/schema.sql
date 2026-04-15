@@ -17,6 +17,7 @@ create table public.user_profiles (
     invite_code text unique,
     invited_by uuid references public.user_profiles(id),
     invited_count int not null default 0,
+    invitation_verified boolean not null default false,
     -- 时间戳
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
@@ -136,14 +137,23 @@ returns boolean as $$
 declare
     code_record record;
 begin
+    -- Case-insensitive code matching (uppercased on input)
     select * into code_record
     from public.invitation_codes
-    where code = invitation_code
+    where code = upper(invitation_code)
       and is_active = true
       and (expires_at is null or expires_at > now())
       and used_count < max_uses;
 
     if not found then
+        return false;
+    end if;
+
+    -- Prevent the same user from redeeming the same code twice
+    if exists (
+        select 1 from public.invitation_uses
+        where code_id = code_record.id and used_by = user_uuid
+    ) then
         return false;
     end if;
 
@@ -163,9 +173,10 @@ begin
         where id = code_record.created_by;
     end if;
 
-    -- 更新被邀请人的 invited_by
+    -- 标记被邀请人已验证，并记录邀请来源
     update public.user_profiles
-    set invited_by = code_record.created_by
+    set invitation_verified = true,
+        invited_by = code_record.created_by
     where id = user_uuid;
 
     return true;

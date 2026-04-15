@@ -415,13 +415,11 @@ async function resetDailyCount(
 }
 
 /**
- * Checks whether the user is within their daily chat quota. If over the
- * limit, returns a 429 Response. Otherwise increments daily_chat_count and
- * returns null (caller may proceed).
+ * Checks whether the user is within their daily chat quota using an atomic
+ * Supabase RPC (check_and_increment_chat_quota). The RPC uses SELECT ... FOR
+ * UPDATE to prevent concurrent requests from bypassing the daily limit.
  *
- * Note: the increment uses a read-then-write pattern. A minor race condition
- * exists for concurrent requests, but is acceptable at early-access scale.
- * Replace with an atomic SQL RPC if higher accuracy is needed later.
+ * Returns a 429 Response if over the limit, or null if quota OK.
  */
 async function checkAndIncrementChatQuota(
   userId: string,
@@ -430,50 +428,51 @@ async function checkAndIncrementChatQuota(
   const supabaseURL = env.SUPABASE_URL!;
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY!;
 
-  const profile = await fetchUserQuotaProfile(userId, supabaseURL, serviceRoleKey);
+  const rpcURL = `${supabaseURL}/rest/v1/rpc/check_and_increment_chat_quota`;
 
-  if (!profile) {
-    // Fail open: proceed if we cannot read the DB (e.g. Supabase downtime).
-    console.warn(`[quota] Could not read profile for ${userId} — failing open`);
+  let rpcResult: { allowed?: boolean; error?: string; plan?: string; daily_limit?: number; used_today?: number; remaining?: number };
+
+  try {
+    const res = await fetch(rpcURL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${serviceRoleKey}`,
+        "apikey": serviceRoleKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ user_uuid: userId }),
+    });
+
+    if (!res.ok) {
+      // Fail open: proceed if the RPC call fails (e.g. Supabase downtime).
+      console.warn(`[quota] RPC failed for ${userId}: ${res.status} — failing open`);
+      return null;
+    }
+
+    rpcResult = await res.json() as typeof rpcResult;
+  } catch (err) {
+    console.warn(`[quota] RPC network error for ${userId} — failing open:`, err);
     return null;
   }
 
-  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-
-  // Reset count if last reset was before today (new calendar day).
-  if (profile.daily_chat_reset_at < today) {
-    await resetDailyCount(userId, today, supabaseURL, serviceRoleKey);
-    profile.daily_chat_count = 0;
+  if (rpcResult.error === "user_not_found") {
+    console.warn(`[quota] No profile found for ${userId} — failing open`);
+    return null;
   }
 
-  const planName = profile.plan ?? "free";
-  const dailyLimit = PLAN_DAILY_CHAT_LIMITS[planName] ?? PLAN_DAILY_CHAT_LIMITS.free;
-
-  if (profile.daily_chat_count >= dailyLimit) {
+  if (rpcResult.allowed === false) {
     return new Response(
       JSON.stringify({
         error: "daily_limit_exceeded",
-        message: `每日 ${dailyLimit} 次对话额度已用完，请明天再试或升级套餐。`,
-        plan: planName,
-        daily_limit: dailyLimit,
-        used_today: profile.daily_chat_count,
+        message: `每日 ${rpcResult.daily_limit} 次对话额度已用完，请明天再试或升级套餐。`,
+        plan: rpcResult.plan,
+        daily_limit: rpcResult.daily_limit,
+        used_today: rpcResult.used_today,
         remaining: 0,
       }),
       { status: 429, headers: { "content-type": "application/json" } }
     );
   }
-
-  // Increment daily_chat_count (best-effort, before proxying to upstream).
-  await fetch(`${supabaseURL}/rest/v1/user_profiles?id=eq.${userId}`, {
-    method: "PATCH",
-    headers: {
-      "Authorization": `Bearer ${serviceRoleKey}`,
-      "apikey": serviceRoleKey,
-      "Content-Type": "application/json",
-      "Prefer": "return=minimal",
-    },
-    body: JSON.stringify({ daily_chat_count: profile.daily_chat_count + 1 }),
-  });
 
   return null; // quota OK
 }
