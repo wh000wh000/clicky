@@ -15,8 +15,10 @@ struct CompanionPanelView: View {
     @ObservedObject private var supabaseAuthManager = SupabaseAuthManager.shared
     @ObservedObject private var apiConfig = APIConfiguration.shared
     @ObservedObject private var whisperKitManager = WhisperKitModelManager.shared
+    @ObservedObject private var localizationManager = LocalizationManager.shared
     @State private var textQueryInput: String = ""
     @State private var showAPISettings: Bool = false
+    @State private var showGeneralSettings: Bool = false
     @State private var signInEmail: String = ""
     @State private var signInPassword: String = ""
     @State private var isSigningIn: Bool = false
@@ -50,6 +52,19 @@ struct CompanionPanelView: View {
             permissionsCopySection
                 .padding(.top, 16)
                 .padding(.horizontal, 16)
+
+            // "Next Step" button — shown only while the onboarding guide is
+            // actively running so the user (or tester) can skip a step without
+            // performing the required action.
+            if companionManager.hasCompletedOnboarding
+                && companionManager.allPermissionsGranted
+                && companionManager.onboardingGuideManager.currentStep != .completed {
+                Spacer()
+                    .frame(height: 10)
+
+                nextOnboardingStepButton
+                    .padding(.horizontal, 16)
+            }
 
             if companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
                 Spacer()
@@ -136,10 +151,19 @@ struct CompanionPanelView: View {
         }
         .frame(width: 320)
         .background(panelBackground)
+        // Inject the current locale so all Text("key") calls resolve to the
+        // correct Localizable.xcstrings entry without requiring an app restart.
+        .environment(\.locale, localizationManager.currentLocale)
+        .sheet(isPresented: $showGeneralSettings) {
+            GeneralSettingsView(companionManager: companionManager)
+        }
         .sheet(isPresented: $showAPISettings) {
             APISettingsView(apiConfiguration: APIConfiguration.shared, companionManager: companionManager)
                 .onDisappear {
                     companionManager.reloadAPIClients()
+                    // Also reload the STT provider so changing the speech-to-text
+                    // provider in Settings takes effect immediately without restart.
+                    companionManager.buddyDictationManager.reloadTranscriptionProvider()
                 }
         }
         } // end else (normal panel content)
@@ -169,6 +193,19 @@ struct CompanionPanelView: View {
                 .foregroundColor(DS.Colors.textTertiary)
 
             if companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
+                Button(action: { showGeneralSettings = true }) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(DS.Colors.textTertiary)
+                        .frame(width: 20, height: 20)
+                        .background(
+                            Circle()
+                                .fill(DS.Colors.surface2)
+                        )
+                }
+                .buttonStyle(.plain)
+                .pointerCursor()
+
                 Button(action: { showAPISettings = true }) {
                     Image(systemName: "gearshape")
                         .font(.system(size: 10, weight: .semibold))
@@ -270,6 +307,33 @@ struct CompanionPanelView: View {
             .buttonStyle(.plain)
             .pointerCursor()
         }
+    }
+
+    // MARK: - Next Onboarding Step Button
+
+    private var nextOnboardingStepButton: some View {
+        Button(action: {
+            companionManager.onboardingGuideManager.skipCurrentStep()
+        }) {
+            HStack(spacing: 4) {
+                Text("Next Step")
+                    .font(.system(size: 11, weight: .medium))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .foregroundColor(DS.Colors.accentText)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(DS.Colors.surface1)
+            )
+            .overlay(
+                Capsule().stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .pointerCursor()
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     // MARK: - Permissions
@@ -1096,9 +1160,24 @@ struct CompanionPanelView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .transition(.opacity)
                     }
+
+                    // API error banner (e.g. invalid key, model not found, network error)
+                    if let apiError = companionManager.lastAPIErrorMessage {
+                        HStack(spacing: 5) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(.system(size: 9))
+                            Text(apiError)
+                                .font(.system(size: 10))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .foregroundColor(DS.Colors.warning)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity)
+                    }
                 }
                 .animation(.easeInOut(duration: DS.Animation.normal), value: currentDailyUsed)
                 .animation(.easeInOut(duration: DS.Animation.normal), value: companionManager.isQuotaExceeded)
+                .animation(.easeInOut(duration: DS.Animation.normal), value: companionManager.lastAPIErrorMessage)
             }
         }
         .padding(.horizontal, 12)

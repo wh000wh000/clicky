@@ -33,13 +33,10 @@ class OverlayWindow: NSWindow {
         // Important: Allow the window to appear even when app is not active
         self.hidesOnDeactivate = false
 
-        // Cover the entire screen
+        // Cover the entire screen. Called here for initial positioning; showOverlay
+        // calls setFrame again after orderFrontRegardless to guard against macOS
+        // repositioning borderless windows during the ordering pass.
         self.setFrame(screen.frame, display: true)
-
-        // Make sure it's on the right screen
-        if let screenForWindow = NSScreen.screens.first(where: { $0.frame == screen.frame }) {
-            self.setFrameOrigin(screenForWindow.frame.origin)
-        }
     }
 
     // Prevent window from becoming key (no focus stealing)
@@ -384,7 +381,11 @@ struct BlueCursorView: View {
     // MARK: - Cursor Tracking
 
     private func startTrackingCursor() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
+        // Use .common RunLoop mode so the timer fires even during event-tracking
+        // runloop mode (mouse drags, scroll events in other apps). The default
+        // .scheduledTimer mode pauses during tracking, which freezes cursor following
+        // on all screens until the dragging ends.
+        let trackingTimer = Timer(timeInterval: 0.016, repeats: true) { _ in
             let mouseLocation = NSEvent.mouseLocation
             self.isCursorOnThisScreen = self.screenFrame.contains(mouseLocation)
 
@@ -409,12 +410,20 @@ struct BlueCursorView: View {
                 return
             }
 
+            // Only update cursor position when the cursor is on this screen.
+            // Updating position on inactive screens triggers the spring animation
+            // modifier, which bleeds into opacity and causes a slow fade-out
+            // instead of an instant hide — making the buddy appear on all screens.
+            guard self.isCursorOnThisScreen else { return }
+
             // Normal cursor following
             let swiftUIPosition = self.convertScreenPointToSwiftUICoordinates(mouseLocation)
             let buddyX = swiftUIPosition.x + 35
             let buddyY = swiftUIPosition.y + 25
             self.cursorPosition = CGPoint(x: buddyX, y: buddyY)
         }
+        RunLoop.main.add(trackingTimer, forMode: .common)
+        timer = trackingTimer
     }
 
     /// Converts a macOS screen point (AppKit, bottom-left origin) to SwiftUI
@@ -772,11 +781,20 @@ class OverlayWindowManager {
             )
 
             let hostingView = NSHostingView(rootView: contentView)
-            hostingView.frame = screen.frame
+            // Use local coordinates (origin zero) for the hosting view inside
+            // the window. Using global screen.frame would offset the SwiftUI
+            // content on secondary monitors (e.g. origin at {2560,0}).
+            hostingView.frame = CGRect(origin: .zero, size: screen.frame.size)
             window.contentView = hostingView
 
             overlayWindows.append(window)
             window.orderFrontRegardless()
+
+            // Re-assert frame after ordering. macOS can silently reposition borderless
+            // windows on secondary monitors during orderFrontRegardless (the window
+            // server may snap them toward the primary screen before the first paint).
+            // Calling setFrame here ensures each overlay lands on the correct screen.
+            window.setFrame(screen.frame, display: false)
         }
     }
 

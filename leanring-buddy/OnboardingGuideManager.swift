@@ -53,9 +53,27 @@ final class OnboardingGuideManager: ObservableObject {
 
     /// Starts the guide from the current persisted step. Called when the
     /// overlay first appears after the user clicks "Start".
-    func startGuide() {
+    /// Pass `allPermissionsGranted: true` when permissions are already
+    /// satisfied so the welcome step auto-advances instead of getting stuck.
+    func startGuide(allPermissionsGranted: Bool = false) {
         guard currentStep != .completed else { return }
+
+        // If the welcome step's condition is already met (permissions were
+        // granted in a previous session), skip straight to the next step
+        // instead of showing "grant the permissions above" text.
+        if currentStep == .welcome && allPermissionsGranted {
+            advanceToNextStep()
+            return
+        }
+
         showGuideBubbleForCurrentStep()
+    }
+
+    /// Skips the current onboarding step. Useful for testing or when the
+    /// user wants to move forward without completing the step's action.
+    func skipCurrentStep() {
+        guard currentStep != .completed else { return }
+        advanceToNextStep()
     }
 
     /// Called by CompanionManager when an event occurs that might complete

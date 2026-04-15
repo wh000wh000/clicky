@@ -34,6 +34,9 @@ final class CompanionManager: ObservableObject {
     /// True after the proxy Worker returns 429 daily_limit_exceeded.
     /// Cleared automatically when the user starts the next interaction.
     @Published private(set) var isQuotaExceeded: Bool = false
+    /// A user-facing error message from the last API call, e.g. "API Key 未配置"
+    /// Cleared automatically when the user starts the next interaction.
+    @Published private(set) var lastAPIErrorMessage: String?
     @Published private(set) var lastTranscript: String?
     @Published private(set) var currentAudioPowerLevel: CGFloat = 0
     @Published private(set) var hasAccessibilityPermission = false
@@ -100,6 +103,21 @@ final class CompanionManager: ObservableObject {
             apiKey: config.ttsAPIKey,
             model: config.ttsAPIModel,
             voice: config.ttsAPIVoiceID.isEmpty ? "alloy" : config.ttsAPIVoiceID
+        )
+    }()
+
+    /// Optional element location detector for precise UI element coordinate detection.
+    /// Lazily initialized from APIConfiguration on first use; replaced by reloadAPIClients()
+    /// whenever the user changes settings. Non-nil only when an API key and base URL
+    /// are both configured.
+    private lazy var elementLocationDetector: ElementLocationDetector? = {
+        let config = APIConfiguration.shared
+        let apiKey = config.elementDetectionAPIKey
+        guard !apiKey.isEmpty, !config.elementDetectionBaseURL.isEmpty else { return nil }
+        return ElementLocationDetector(
+            baseURL: config.elementDetectionBaseURL,
+            apiKey: apiKey,
+            model: config.elementDetectionModel
         )
     }()
 
@@ -244,6 +262,21 @@ final class CompanionManager: ObservableObject {
         // well before the onboarding demo fires at ~40s into the video.
         _ = claudeAPI
 
+        // Rebuild overlay windows whenever the display configuration changes
+        // (monitor hotplug, arrangement change, resolution change). Without this,
+        // a screen added after app launch never gets an overlay window.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            guard self.isOverlayVisible else { return }
+            // Recreate all overlay windows for the current screen layout.
+            // hasShownOverlayBefore stays true so the welcome animation doesn't replay.
+            self.overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
+        }
+
         // If the user already completed onboarding AND all permissions are
         // still granted, show the cursor overlay immediately. If permissions
         // were revoked (e.g. signing change), don't show the cursor — the
@@ -268,8 +301,10 @@ final class CompanionManager: ObservableObject {
         overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
         isOverlayVisible = true
 
-        // Start the step-by-step text guide
-        onboardingGuideManager.startGuide()
+        // Start the step-by-step text guide. Pass current permission state
+        // so the welcome step auto-advances when permissions are already granted
+        // (e.g. after resetting onboarding for testing).
+        onboardingGuideManager.startGuide(allPermissionsGranted: allPermissionsGranted)
     }
 
     /// Resets onboarding state so the user can re-experience the tutorial.
@@ -338,6 +373,26 @@ final class CompanionManager: ObservableObject {
             model: config.ttsAPIModel,
             voice: config.ttsAPIVoiceID.isEmpty ? "alloy" : config.ttsAPIVoiceID
         )
+
+        // Recreate element location detector when settings change.
+        // Only active when the user has provided an API key and base URL.
+        let elementDetectionAPIKey = config.elementDetectionAPIKey
+        if !elementDetectionAPIKey.isEmpty && !config.elementDetectionBaseURL.isEmpty {
+            elementLocationDetector = ElementLocationDetector(
+                baseURL: config.elementDetectionBaseURL,
+                apiKey: elementDetectionAPIKey,
+                model: config.elementDetectionModel
+            )
+        } else {
+            elementLocationDetector = nil
+        }
+
+        // Auto-sync CosyVoice2 voice ID to the current language when the user is already
+        // using a known language variant. Does not override custom / non-standard voice IDs.
+        let knownCosyVoiceIDs = Set(AppLanguage.allCases.map { $0.cosyVoice2VoiceID })
+        if config.ttsProvider == .openaiCompatible && knownCosyVoiceIDs.contains(config.ttsAPIVoiceID) {
+            config.ttsAPIVoiceID = LocalizationManager.shared.currentLanguage.cosyVoice2VoiceID
+        }
     }
 
     func refreshAllPermissions() {
@@ -674,7 +729,9 @@ final class CompanionManager: ObservableObject {
 
     // MARK: - Companion Prompt
 
-    private static let companionVoiceResponseSystemPrompt = """
+    /// The core system prompt without a language instruction. The computed property
+    /// `companionVoiceResponseSystemPrompt` appends the active language directive at runtime.
+    private static let companionVoiceResponseBaseSystemPrompt = """
     you're clicky, a friendly always-on companion that lives in the user's menu bar. the user just spoke to you via push-to-talk and you can see their screen(s). your reply will be spoken aloud via text-to-speech, so write the way you'd actually talk. this is an ongoing conversation — you remember everything they've said before.
 
     rules:
@@ -708,6 +765,13 @@ final class CompanionManager: ObservableObject {
     - user asks how to commit in xcode: "see that source control menu up top? click that and hit commit, or you can use command option c as a shortcut. [POINT:285,11:source control]"
     - element is on screen 2 (not where cursor is): "that's over on your other monitor — see the terminal window? [POINT:400,300:terminal:screen2]"
     """
+
+    /// The effective system prompt, appending a language instruction so Claude always
+    /// responds in the language selected in General Settings.
+    private var companionVoiceResponseSystemPrompt: String {
+        let languageInstruction = LocalizationManager.shared.currentLanguage.claudeResponseLanguageInstruction
+        return Self.companionVoiceResponseBaseSystemPrompt + "\n\nlanguage: \(languageInstruction)"
+    }
 
     // MARK: - AI Response Pipeline
 
@@ -756,13 +820,14 @@ final class CompanionManager: ObservableObject {
         currentResponseTask = Task {
             // Stay in processing (spinner) state — no streaming text displayed
             voiceState = .processing
-            isQuotaExceeded = false  // Clear any previous quota-exceeded banner
+            isQuotaExceeded = false   // Clear any previous quota-exceeded banner
+            lastAPIErrorMessage = nil // Clear any previous API error banner
 
             do {
                 // Capture the user's current scene (frontmost app + window title)
                 // so Claude knows what app the user is working in.
                 let sceneContext = SceneContextDetector.captureCurrentSceneContext()
-                let systemPromptWithContext = Self.companionVoiceResponseSystemPrompt + sceneContext.contextSummaryForSystemPrompt
+                let systemPromptWithContext = companionVoiceResponseSystemPrompt + sceneContext.contextSummaryForSystemPrompt
 
                 // Capture all connected screens so the AI has full context
                 let screenCaptures = try await CompanionScreenCaptureUtility.captureAllScreensAsJPEG()
@@ -865,13 +930,39 @@ final class CompanionManager: ObservableObject {
                     // Convert from top-left origin (screenshot) to bottom-left origin (AppKit)
                     let appKitY = displayHeight - displayLocalY
 
-                    // Convert display-local coords to global screen coords
-                    let globalLocation = CGPoint(
+                    // Claude's rough estimate in global AppKit coordinates
+                    let claudeGlobalLocation = CGPoint(
                         x: displayLocalX + displayFrame.origin.x,
                         y: appKitY + displayFrame.origin.y
                     )
 
-                    detectedElementScreenLocation = globalLocation
+                    // If an element location detector is configured (e.g. UI-TARS),
+                    // use it to refine Claude's rough coordinate to a precise pixel location.
+                    // Fall back to Claude's estimate if the detector fails or returns nil.
+                    var finalGlobalLocation = claudeGlobalLocation
+                    if let detector = elementLocationDetector,
+                       let elementLabel = parseResult.elementLabel,
+                       !elementLabel.isEmpty {
+                        print("🎯 Element pointing: running precise detection for \"\(elementLabel)\"...")
+                        if let refinedDisplayLocalCoordinate = await detector.detectElementLocation(
+                            screenshotData: targetScreenCapture.imageData,
+                            elementQuery: elementLabel,
+                            displayWidthInPoints: targetScreenCapture.displayWidthInPoints,
+                            displayHeightInPoints: targetScreenCapture.displayHeightInPoints
+                        ) {
+                            // detector returns display-local AppKit coords (bottom-left origin);
+                            // add the display's global offset to get global screen coords.
+                            finalGlobalLocation = CGPoint(
+                                x: refinedDisplayLocalCoordinate.x + displayFrame.origin.x,
+                                y: refinedDisplayLocalCoordinate.y + displayFrame.origin.y
+                            )
+                            print("🎯 Element pointing: refined (\(Int(claudeGlobalLocation.x)), \(Int(claudeGlobalLocation.y))) → (\(Int(finalGlobalLocation.x)), \(Int(finalGlobalLocation.y)))")
+                        } else {
+                            print("🎯 Element pointing: detector returned nil, using Claude's estimate")
+                        }
+                    }
+
+                    detectedElementScreenLocation = finalGlobalLocation
                     detectedElementDisplayFrame = displayFrame
                     ClickyAnalytics.trackElementPointed(elementLabel: parseResult.elementLabel)
                     print("🎯 Element pointing: (\(Int(pointCoordinate.x)), \(Int(pointCoordinate.y))) → \"\(parseResult.elementLabel ?? "element")\"")
@@ -992,7 +1083,8 @@ final class CompanionManager: ObservableObject {
     /// telling the user to re-grant access in System Settings.
     private func speakScreenPermissionErrorFallback() {
         let utterance = String(localized: "I can't see your screen right now. Please open the Clicky panel and re-grant screen recording permission.")
-        let synthesizer = NSSpeechSynthesizer()
+        let voiceIdentifier = LocalizationManager.shared.currentLanguage.nsSpeechSynthesizerVoiceIdentifier
+        let synthesizer = NSSpeechSynthesizer(voice: NSSpeechSynthesizer.VoiceName(rawValue: voiceIdentifier)) ?? NSSpeechSynthesizer()
         synthesizer.startSpeaking(utterance)
         voiceState = .responding
     }
@@ -1002,46 +1094,65 @@ final class CompanionManager: ObservableObject {
     /// works even when ElevenLabs is down.
     private func speakCreditsErrorFallback() {
         let utterance = String(localized: "I'm all out of credits. Please DM Farza and tell him to bring me back to life.")
-        let synthesizer = NSSpeechSynthesizer()
+        let voiceIdentifier = LocalizationManager.shared.currentLanguage.nsSpeechSynthesizerVoiceIdentifier
+        let synthesizer = NSSpeechSynthesizer(voice: NSSpeechSynthesizer.VoiceName(rawValue: voiceIdentifier)) ?? NSSpeechSynthesizer()
         synthesizer.startSpeaking(utterance)
         voiceState = .responding
     }
 
-    /// Speaks a contextual error message based on the HTTP status code and
-    /// current API mode. In proxy mode, falls back to the "credits" message.
-    /// In direct mode, gives a more helpful diagnostic message.
+    /// Speaks a contextual error message and shows a visible banner in the panel
+    /// based on the HTTP status code. The banner persists until the next interaction.
     private func speakContextualErrorFallback(_ error: Error) {
         let isDirectMode = APIConfiguration.shared.chatAPIMode == .direct
 
-        // Extract HTTP status code from NSError if available
-        let statusCode: Int? = (error as NSError).domain == "OpenAICompatibleChatAPI"
-            || (error as NSError).domain == "ClaudeAPI"
-            ? (error as NSError).code
-            : nil
+        // Extract HTTP status code from NSError if available.
+        // Check all API client domains (chat and TTS).
+        let nsError = error as NSError
+        let apiDomains: Set<String> = [
+            "OpenAICompatibleChatAPI", "ClaudeAPI", "OpenAICompatibleTTS"
+        ]
+        let statusCode: Int? = apiDomains.contains(nsError.domain) ? nsError.code : nil
 
         let utterance: String
+        let bannerMessage: String
+
         if !isDirectMode {
-            // Proxy mode: generic credits message (Worker handles auth/quota)
-            utterance = String(localized: "I'm all out of credits. Please DM Farza and tell him to bring me back to life.")
+            // Proxy mode: Worker handles auth/quota, generic message for unexpected errors.
+            utterance = String(localized: "Something went wrong. Please try again later.")
+            bannerMessage = String(localized: "服务出错，请稍后重试。")
         } else if let code = statusCode {
             switch code {
+            case 400:
+                utterance = String(localized: "The API rejected the request. Please check the model and voice settings.")
+                bannerMessage = String(localized: "请求被拒绝，请检查模型名称和参数设置。")
             case 401, 403:
                 utterance = String(localized: "API key is invalid or expired. Please check your API key in the settings.")
+                bannerMessage = String(localized: "API Key 无效或未配置，请在设置中填写正确的 Key。")
             case 402:
                 utterance = String(localized: "Your API account balance is insufficient. Please top up your account.")
+                bannerMessage = String(localized: "API 账户余额不足，请充值后重试。")
             case 404:
                 utterance = String(localized: "The selected model was not found. Please check the model name in settings.")
+                bannerMessage = String(localized: "模型未找到，请检查设置中的模型名称。")
             case 429:
                 utterance = String(localized: "Too many requests. Please wait a moment and try again.")
+                bannerMessage = String(localized: "请求过于频繁，请稍后重试。")
             default:
                 utterance = String(localized: "Something went wrong with the API request. Please check the settings and try again.")
+                bannerMessage = String(localized: "API 请求出错（\(code)），请检查设置后重试。")
             }
         } else {
             // Network error or other non-HTTP error
             utterance = String(localized: "I couldn't reach the API server. Please check your network connection and settings.")
+            bannerMessage = String(localized: "无法连接到 API 服务器，请检查网络和设置。")
         }
 
-        let synthesizer = NSSpeechSynthesizer()
+        // Show a visible banner in the panel so the user sees the error even if
+        // they miss the spoken message or have their volume muted.
+        lastAPIErrorMessage = bannerMessage
+
+        let voiceIdentifier = LocalizationManager.shared.currentLanguage.nsSpeechSynthesizerVoiceIdentifier
+        let synthesizer = NSSpeechSynthesizer(voice: NSSpeechSynthesizer.VoiceName(rawValue: voiceIdentifier)) ?? NSSpeechSynthesizer()
         synthesizer.startSpeaking(utterance)
         voiceState = .responding
     }

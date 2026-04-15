@@ -63,7 +63,7 @@ struct APIPreset {
             (id: "Qwen/Qwen3.5-27B", displayName: "Qwen3.5-27B (Dense)"),
             (id: "Kimi-K2.5", displayName: "Kimi K2.5 (1T MoE)"),
         ],
-        defaultChatModel: "Qwen/Qwen3.5-397B-A17B",
+        defaultChatModel: "Qwen/Qwen3.5-35B-A3B",
         ttsProvider: .openaiCompatible
     )
 
@@ -108,13 +108,13 @@ final class APIConfiguration: ObservableObject {
 
     private static let defaultWorkerBaseURL = "https://api.lingyuan.ai"
     private static let defaultChatFormat = ChatAPIFormat.openaiCompatible
-    private static let defaultChatModel = "Qwen/Qwen3.5-397B-A17B"
+    private static let defaultChatModel = "Qwen/Qwen3.5-35B-A3B"
     private static let defaultTTSProvider = TTSProvider.openaiCompatible
     private static let defaultTTSModel = "FunAudioLLM/CosyVoice2-0.5B"
     private static let defaultTTSVoiceID = "FunAudioLLM/CosyVoice2-0.5B:alex"
     private static let defaultSTTProvider = STTProvider.whisperKit
-    private static let defaultElementDetectionURL = "https://api.anthropic.com/v1/messages"
-    private static let defaultElementDetectionModel = "claude-sonnet-4-6"
+    private static let defaultElementDetectionURL = "https://openrouter.ai/api/v1"
+    private static let defaultElementDetectionModel = "bytedance/ui-tars-1.5-7b"
 
     // MARK: - Chat API
 
@@ -167,6 +167,18 @@ final class APIConfiguration: ObservableObject {
         }
     }
 
+    /// Returns the name of the currently active preset if the current settings
+    /// exactly match a known preset, or nil if the user has customized beyond one.
+    var activePresetName: String? {
+        guard chatAPIMode == .direct else { return nil }
+        for preset in APIPreset.allPresets {
+            if chatAPIFormat == preset.chatFormat && chatAPIBaseURL == preset.chatBaseURL {
+                return preset.name
+            }
+        }
+        return nil
+    }
+
     /// Returns the two models shown in the panel's quick model picker,
     /// matched to the current effective API format so the labels and IDs
     /// stay in sync with the active provider.
@@ -174,8 +186,8 @@ final class APIConfiguration: ObservableObject {
         let format = effectiveChatAPIFormat
         if format == .openaiCompatible {
             return [
-                (id: APIPreset.siliconFlow.chatModels[0].id, label: "397B"),
-                (id: APIPreset.siliconFlow.chatModels[1].id, label: "122B"),
+                (id: APIPreset.siliconFlow.chatModels[2].id, label: "35B"),
+                (id: APIPreset.siliconFlow.chatModels[3].id, label: "27B"),
             ]
         } else {
             return [
@@ -330,9 +342,16 @@ final class APIConfiguration: ObservableObject {
         ttsProvider = preset.ttsProvider
         if preset.ttsProvider == .openaiCompatible {
             ttsAPIBaseURL = preset.chatBaseURL
-            ttsAPIModel = "CosyVoice2-0.5B"
+            ttsAPIModel = Self.defaultTTSModel
+            ttsAPIVoiceID = Self.defaultTTSVoiceID
+        } else if preset.ttsProvider == .elevenLabs {
+            // Reset TTS back to the Worker proxy so it doesn't inherit
+            // a stale SiliconFlow URL from a previously applied preset.
+            ttsAPIBaseURL = Self.defaultWorkerBaseURL
+            ttsAPIModel = "eleven_flash_v2_5"
+            ttsAPIVoiceID = ""
         }
-        sttAPIBaseURL = preset.chatBaseURL
+        // STT config is managed independently — do not overwrite it here.
     }
 
     // MARK: - Keychain Helpers

@@ -73,9 +73,29 @@ enum CompanionScreenCaptureUtility {
             // Use NSScreen.frame (AppKit coordinates, bottom-left origin) so
             // displayFrame is in the same coordinate system as NSEvent.mouseLocation
             // and the overlay window's screenFrame in BlueCursorView.
-            let displayFrame = nsScreenByDisplayID[display.displayID]?.frame
-                ?? CGRect(x: display.frame.origin.x, y: display.frame.origin.y,
-                          width: CGFloat(display.width), height: CGFloat(display.height))
+            //
+            // Fallback: SCDisplay.frame uses CoreGraphics coordinates (Y-axis
+            // increases downward from the top-left of the primary screen), which
+            // is the opposite of AppKit (Y increases upward from the bottom-left).
+            // We must convert the CG origin to AppKit before using it downstream.
+            let displayFrame: CGRect
+            if let nsScreen = nsScreenByDisplayID[display.displayID] {
+                displayFrame = nsScreen.frame
+            } else {
+                let primaryScreenHeight = NSScreen.screens.first?.frame.height
+                    ?? CGFloat(display.height)
+                let appKitOriginY = primaryScreenHeight
+                    - display.frame.origin.y
+                    - CGFloat(display.height)
+                displayFrame = CGRect(
+                    x: display.frame.origin.x,
+                    y: appKitOriginY,
+                    width: CGFloat(display.width),
+                    height: CGFloat(display.height)
+                )
+                print("⚠️ CompanionScreenCapture: display \(display.displayID) not found in NSScreen lookup — " +
+                      "converted CG frame to AppKit: \(displayFrame)")
+            }
             let isCursorScreen = displayFrame.contains(mouseLocation)
 
             let filter = SCContentFilter(display: display, excludingWindows: ownAppWindows)

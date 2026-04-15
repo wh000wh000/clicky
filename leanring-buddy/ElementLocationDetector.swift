@@ -2,28 +2,35 @@
 //  ElementLocationDetector.swift
 //  leanring-buddy
 //
-//  Uses Claude's Computer Use API to identify the screen location of UI elements
-//  in screenshots. When a user asks about a visible element (e.g., "click the
-//  blue button"), this detects the element's coordinates so the buddy can
-//  animate to it and point at it.
+//  Detects the screen location of UI elements in screenshots for precise cursor pointing.
+//  Supports two backends, auto-selected by model name:
+//
+//  • UI-TARS-1.5-7B (model name contains "ui-tars"):
+//    OpenAI-compatible chat completions API (e.g. via OpenRouter). Specialized GUI
+//    grounding model with ~61.6% ScreenSpot-Pro accuracy — 2.2× better than Claude
+//    Computer Use. Outputs 0–1000 normalized bounding box coordinates.
+//
+//  • Claude Computer Use (all other models):
+//    Anthropic-proprietary `computer_20251124` tool. Uses aspect-ratio-matched
+//    resize to Anthropic's recommended resolutions for best coordinate accuracy.
 //
 
 import AppKit
 import Foundation
 
-/// Detects the screen location of UI elements in screenshots using Claude's Computer Use API.
-/// The Computer Use tool definition activates Claude's specialized pixel-counting training,
-/// which is significantly more accurate than regular vision API coordinate extraction.
-///
-/// **Aspect ratio matching**: Instead of always resizing to 1024x768 (4:3), we pick the
-/// Anthropic-recommended resolution closest to the display's actual aspect ratio. Most
-/// Macs are 16:10 → 1280x800. This avoids distorting the image Claude sees, which
-/// significantly improves X-axis coordinate accuracy.
 class ElementLocationDetector {
     private let apiKey: String
-    private let apiURL: URL
+    private let baseURL: String
     private let model: String
     private let session: URLSession
+
+    /// Whether to use the UI-TARS backend (OpenAI-compatible).
+    /// Detected by checking if the model name contains "ui-tars".
+    private var isUITARSBackend: Bool {
+        model.lowercased().contains("ui-tars")
+    }
+
+    // MARK: - Claude Computer Use Constants
 
     /// Anthropic-recommended resolutions for Computer Use, paired with their aspect ratios.
     /// We pick the one closest to the actual display aspect ratio to avoid distortion.
@@ -35,90 +42,268 @@ class ElementLocationDetector {
         (1366, 768,  1366.0 / 768.0)   // ~16:9  = 1.779 (external monitors, ultrawide fallback)
     ]
 
-    init(apiKey: String, model: String = "claude-sonnet-4-6") {
+    // MARK: - Init
+
+    /// - Parameters:
+    ///   - baseURL: API base URL. For Claude Computer Use, the full messages endpoint
+    ///     (e.g. `https://api.anthropic.com/v1/messages`). For UI-TARS, the OpenAI-
+    ///     compatible base URL without path (e.g. `https://openrouter.ai/api/v1`).
+    ///   - apiKey: API key for the chosen provider.
+    ///   - model: Model ID. If it contains "ui-tars", the UI-TARS backend is used.
+    init(baseURL: String, apiKey: String, model: String) {
+        self.baseURL = baseURL
         self.apiKey = apiKey
-        self.apiURL = URL(string: "https://api.anthropic.com/v1/messages")!
         self.model = model
 
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 20
+        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForResource = 30
         config.waitsForConnectivity = false
         config.urlCache = nil
         config.httpCookieStorage = nil
         self.session = URLSession(configuration: config)
     }
 
-    /// Detects the screen location of a UI element the user is asking about.
+    // MARK: - Public API
+
+    /// Detects the screen location of a named UI element in the screenshot.
     ///
     /// - Parameters:
-    ///   - screenshotData: JPEG or PNG screenshot data from ScreenCaptureKit
-    ///   - userQuestion: The user's voice transcript (e.g., "How do I add a project?")
-    ///   - displayWidthInPoints: The captured display's width in screen points
-    ///   - displayHeightInPoints: The captured display's height in screen points
+    ///   - screenshotData: JPEG or PNG screenshot data from ScreenCaptureKit.
+    ///   - elementQuery: Short description of the element to find (e.g. "save button",
+    ///     "search bar"). For UI-TARS this is used verbatim. For Claude it is embedded
+    ///     in a broader prompt alongside the user's original question.
+    ///   - displayWidthInPoints: Captured display width in screen points (not pixels).
+    ///   - displayHeightInPoints: Captured display height in screen points (not pixels).
     ///
-    /// - Returns: A `CGPoint` in display-local macOS coordinates (bottom-left origin) if an
-    ///   element was identified, or `nil` if no element was found or detection failed.
+    /// - Returns: A `CGPoint` in display-local AppKit coordinates (bottom-left origin)
+    ///   if an element was found, or `nil` if detection failed or no element was found.
     func detectElementLocation(
         screenshotData: Data,
-        userQuestion: String,
+        elementQuery: String,
         displayWidthInPoints: Int,
         displayHeightInPoints: Int
     ) async -> CGPoint? {
-        // Pick the Computer Use resolution that best matches this display's aspect ratio.
-        // This avoids stretching the screenshot (e.g., squishing a 16:10 Mac display
-        // into 4:3), which would distort the image Claude sees and degrade X-axis accuracy.
+        if isUITARSBackend {
+            return await detectWithUITARS(
+                screenshotData: screenshotData,
+                elementQuery: elementQuery,
+                displayWidthInPoints: displayWidthInPoints,
+                displayHeightInPoints: displayHeightInPoints
+            )
+        } else {
+            return await detectWithClaudeComputerUse(
+                screenshotData: screenshotData,
+                elementQuery: elementQuery,
+                displayWidthInPoints: displayWidthInPoints,
+                displayHeightInPoints: displayHeightInPoints
+            )
+        }
+    }
+
+    // MARK: - UI-TARS Backend
+
+    /// Detects an element using UI-TARS-1.5-7B via OpenAI-compatible chat completions.
+    ///
+    /// UI-TARS outputs coordinates in `click(start_box='[x1, y1, x2, y2]')` format
+    /// where all values are in 0–1000 range (normalized × 1000 of the image dimensions).
+    /// The center of the bounding box, scaled to display points, is returned.
+    private func detectWithUITARS(
+        screenshotData: Data,
+        elementQuery: String,
+        displayWidthInPoints: Int,
+        displayHeightInPoints: Int
+    ) async -> CGPoint? {
+        // UI-TARS chat completions endpoint appended to base URL
+        guard let endpointURL = URL(string: baseURL.trimmingCharacters(in: .init(charactersIn: "/")) + "/chat/completions") else {
+            print("⚠️ ElementLocationDetector (UI-TARS): invalid base URL: \(baseURL)")
+            return nil
+        }
+
+        var request = URLRequest(url: endpointURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let mediaType = detectImageMediaType(for: screenshotData)
+        let base64Screenshot = screenshotData.base64EncodedString()
+        let imageDataURL = "data:\(mediaType);base64,\(base64Screenshot)"
+
+        // UI-TARS was trained with this grounding prompt format.
+        // The phrasing "what is the position of the element corresponding to the command"
+        // matches its training distribution and yields the click(start_box=...) output format.
+        let groundingPrompt = "In this UI screenshot, what is the position of the element corresponding to the command \"click \(elementQuery)\"?"
+
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 256,
+            "messages": [
+                [
+                    "role": "user",
+                    "content": [
+                        [
+                            "type": "image_url",
+                            "image_url": ["url": imageDataURL]
+                        ],
+                        [
+                            "type": "text",
+                            "text": groundingPrompt
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+        do {
+            let bodyData = try JSONSerialization.data(withJSONObject: body)
+            request.httpBody = bodyData
+
+            let payloadMB = Double(bodyData.count) / 1_048_576.0
+            print("🎯 ElementLocationDetector (UI-TARS): querying \"\(elementQuery)\", payload \(String(format: "%.1f", payloadMB))MB")
+
+            let (data, response) = try await session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+                let errorBody = String(data: data, encoding: .utf8) ?? "unknown"
+                print("⚠️ ElementLocationDetector (UI-TARS): API error \(statusCode): \(errorBody.prefix(300))")
+                return nil
+            }
+
+            return parseUITARSCoordinates(
+                responseData: data,
+                displayWidthInPoints: displayWidthInPoints,
+                displayHeightInPoints: displayHeightInPoints
+            )
+
+        } catch {
+            print("⚠️ ElementLocationDetector (UI-TARS): request failed: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Parses UI-TARS's `click(start_box='[x1, y1, x2, y2]')` response and converts
+    /// the bounding box center to display-local AppKit coordinates.
+    ///
+    /// UI-TARS outputs coordinates in 0–1000 range normalized by image dimensions.
+    /// Converting to display points: `(coord / 1000) * displayDimension`.
+    private func parseUITARSCoordinates(
+        responseData: Data,
+        displayWidthInPoints: Int,
+        displayHeightInPoints: Int
+    ) -> CGPoint? {
+        guard let json = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
+              let choices = json["choices"] as? [[String: Any]],
+              let firstChoice = choices.first,
+              let message = firstChoice["message"] as? [String: Any],
+              let responseText = message["content"] as? String else {
+            print("⚠️ ElementLocationDetector (UI-TARS): could not parse response JSON")
+            return nil
+        }
+
+        print("🎯 ElementLocationDetector (UI-TARS): raw response: \(responseText.prefix(200))")
+
+        // Match click(start_box='[x1, y1, x2, y2]') or click(start_box='(x1, y1, x2, y2)')
+        // Both bracket styles appear in UI-TARS outputs depending on training variation.
+        let pattern = #"click\(start_box='[\[\(]([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)[\]\)]'\)"#
+
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: responseText, range: NSRange(responseText.startIndex..., in: responseText)),
+              match.numberOfRanges == 5,
+              let x1Range = Range(match.range(at: 1), in: responseText),
+              let y1Range = Range(match.range(at: 2), in: responseText),
+              let x2Range = Range(match.range(at: 3), in: responseText),
+              let y2Range = Range(match.range(at: 4), in: responseText) else {
+            print("⚠️ ElementLocationDetector (UI-TARS): no click coordinate found in response")
+            return nil
+        }
+
+        guard let x1 = Double(responseText[x1Range]),
+              let y1 = Double(responseText[y1Range]),
+              let x2 = Double(responseText[x2Range]),
+              let y2 = Double(responseText[y2Range]) else {
+            print("⚠️ ElementLocationDetector (UI-TARS): could not parse coordinate values")
+            return nil
+        }
+
+        // Center of the bounding box in 0–1000 range
+        let centerX = (x1 + x2) / 2.0
+        let centerY = (y1 + y2) / 2.0
+
+        // Normalize to 0–1 range, then scale to display point dimensions
+        let displayLocalX = (centerX / 1000.0) * Double(displayWidthInPoints)
+        let displayLocalYTopLeftOrigin = (centerY / 1000.0) * Double(displayHeightInPoints)
+
+        // Convert from top-left origin (UI-TARS / CoreGraphics) to bottom-left origin (AppKit)
+        let displayLocalYBottomLeftOrigin = Double(displayHeightInPoints) - displayLocalYTopLeftOrigin
+
+        print("🎯 ElementLocationDetector (UI-TARS): box (\(Int(x1)),\(Int(y1)),\(Int(x2)),\(Int(y2))) " +
+              "→ center (\(Int(centerX)),\(Int(centerY)))/1000 " +
+              "→ display point (\(Int(displayLocalX)), \(Int(displayLocalYBottomLeftOrigin))) AppKit")
+
+        return CGPoint(x: displayLocalX, y: displayLocalYBottomLeftOrigin)
+    }
+
+    // MARK: - Claude Computer Use Backend
+
+    /// Detects an element using Claude's Computer Use API.
+    ///
+    /// The `computer_20251124` tool activates Claude's specialized pixel-counting
+    /// training. We pick the Anthropic-recommended resolution closest to the display's
+    /// actual aspect ratio to avoid distorting the image Claude sees.
+    private func detectWithClaudeComputerUse(
+        screenshotData: Data,
+        elementQuery: String,
+        displayWidthInPoints: Int,
+        displayHeightInPoints: Int
+    ) async -> CGPoint? {
         let computerUseResolution = bestComputerUseResolution(
             forDisplayWidth: displayWidthInPoints,
             displayHeight: displayHeightInPoints
         )
 
-        print("🎯 ElementLocationDetector: display is \(displayWidthInPoints)x\(displayHeightInPoints) " +
+        print("🎯 ElementLocationDetector (Claude): display is \(displayWidthInPoints)x\(displayHeightInPoints) " +
               "(ratio \(String(format: "%.3f", Double(displayWidthInPoints) / Double(displayHeightInPoints)))), " +
               "using Computer Use resolution \(computerUseResolution.width)x\(computerUseResolution.height)")
 
-        // Resize the screenshot to the chosen Computer Use resolution
         guard let resizedScreenshotData = resizeScreenshotForComputerUse(
             originalImageData: screenshotData,
             targetWidth: computerUseResolution.width,
             targetHeight: computerUseResolution.height
         ) else {
-            print("⚠️ ElementLocationDetector: failed to resize screenshot")
+            print("⚠️ ElementLocationDetector (Claude): failed to resize screenshot")
             return nil
         }
 
-        // Make the Computer Use API call with the matching resolution declared
-        guard let computerUseCoordinate = await callComputerUseAPI(
+        guard let claudeCoordinate = await callClaudeComputerUseAPI(
             resizedScreenshotData: resizedScreenshotData,
-            userQuestion: userQuestion,
+            elementQuery: elementQuery,
             declaredDisplayWidth: computerUseResolution.width,
             declaredDisplayHeight: computerUseResolution.height
         ) else {
             return nil
         }
 
-        // Clamp coordinates to the valid range — Claude occasionally returns
-        // values slightly outside the declared display dimensions, which would
-        // map to off-screen positions after scaling.
-        let clampedX = max(0, min(computerUseCoordinate.x, CGFloat(computerUseResolution.width)))
-        let clampedY = max(0, min(computerUseCoordinate.y, CGFloat(computerUseResolution.height)))
+        // Clamp coordinates to the valid range — Claude occasionally returns values
+        // slightly outside the declared display dimensions.
+        let clampedX = max(0, min(claudeCoordinate.x, CGFloat(computerUseResolution.width)))
+        let clampedY = max(0, min(claudeCoordinate.y, CGFloat(computerUseResolution.height)))
 
-        // Scale coordinates from the Computer Use resolution back to actual display point dimensions
+        // Scale from Computer Use resolution back to actual display point dimensions
         let scaledX = (clampedX / CGFloat(computerUseResolution.width)) * CGFloat(displayWidthInPoints)
         let scaledYTopLeftOrigin = (clampedY / CGFloat(computerUseResolution.height)) * CGFloat(displayHeightInPoints)
 
-        // Convert from top-left origin (Computer Use / CoreGraphics) to bottom-left origin (AppKit)
+        // Convert from top-left origin (Computer Use) to bottom-left origin (AppKit)
         let scaledYBottomLeftOrigin = CGFloat(displayHeightInPoints) - scaledYTopLeftOrigin
 
-        print("🎯 ElementLocationDetector: mapped (\(Int(clampedX)), \(Int(clampedY))) in " +
+        print("🎯 ElementLocationDetector (Claude): mapped (\(Int(clampedX)), \(Int(clampedY))) in " +
               "\(computerUseResolution.width)x\(computerUseResolution.height) → " +
-              "(\(Int(scaledX)), \(Int(scaledYBottomLeftOrigin))) in " +
-              "\(displayWidthInPoints)x\(displayHeightInPoints) display-local AppKit coords")
+              "(\(Int(scaledX)), \(Int(scaledYBottomLeftOrigin))) display-local AppKit")
 
         return CGPoint(x: scaledX, y: scaledYBottomLeftOrigin)
     }
-
-    // MARK: - Private Helpers
 
     /// Picks the Anthropic-recommended Computer Use resolution whose aspect ratio
     /// is closest to the actual display, minimizing image distortion.
@@ -144,34 +329,36 @@ class ElementLocationDetector {
         return (width: bestWidth, height: bestHeight)
     }
 
-    /// Calls the Claude Computer Use API with a resized screenshot and user question.
-    /// Returns the raw coordinate from Claude's response in the declared resolution space, or nil.
-    private func callComputerUseAPI(
+    /// Calls the Claude Computer Use API and returns the raw coordinate in the
+    /// declared Computer Use resolution space, or nil if detection failed.
+    private func callClaudeComputerUseAPI(
         resizedScreenshotData: Data,
-        userQuestion: String,
+        elementQuery: String,
         declaredDisplayWidth: Int,
         declaredDisplayHeight: Int
     ) async -> CGPoint? {
-        var request = URLRequest(url: apiURL)
+        guard let endpointURL = URL(string: baseURL) else {
+            print("⚠️ ElementLocationDetector (Claude): invalid URL: \(baseURL)")
+            return nil
+        }
+
+        var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
         request.timeoutInterval = 15
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // The beta header activates Computer Use capabilities and the specialized
+        // The beta header activates Computer Use capabilities and Claude's specialized
         // pixel-counting training that makes coordinate detection accurate.
         request.setValue("computer-use-2025-11-24", forHTTPHeaderField: "anthropic-beta")
 
-        // Detect image media type (PNG vs JPEG)
         let mediaType = detectImageMediaType(for: resizedScreenshotData)
         let base64Screenshot = resizedScreenshotData.base64EncodedString()
 
         let userPrompt = """
-        The user asked this question while looking at their screen: "\(userQuestion)"
+        Locate the UI element described as: "\(elementQuery)"
 
-        Look at the screenshot. If there is a specific UI element (button, link, menu item, text field, icon, etc.) that the user should interact with or is asking about, click on that element.
-
-        If the question is purely conceptual (e.g., "what does HTML mean?") and there's no specific element to point to, just respond with text saying "no specific element".
+        Look at the screenshot. Click on that element. If no such element is visible, respond with text saying "no specific element".
         """
 
         let body: [String: Any] = [
@@ -211,7 +398,7 @@ class ElementLocationDetector {
             request.httpBody = bodyData
 
             let payloadMB = Double(bodyData.count) / 1_048_576.0
-            print("🎯 ElementLocationDetector: sending \(String(format: "%.1f", payloadMB))MB request " +
+            print("🎯 ElementLocationDetector (Claude): sending \(String(format: "%.1f", payloadMB))MB request " +
                   "(declared \(declaredDisplayWidth)x\(declaredDisplayHeight))")
 
             let (data, response) = try await session.data(for: request)
@@ -220,29 +407,27 @@ class ElementLocationDetector {
                   (200...299).contains(httpResponse.statusCode) else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
                 let errorBody = String(data: data, encoding: .utf8) ?? "unknown"
-                print("⚠️ ElementLocationDetector: API error \(statusCode): \(errorBody.prefix(200))")
+                print("⚠️ ElementLocationDetector (Claude): API error \(statusCode): \(errorBody.prefix(200))")
                 return nil
             }
 
-            return parseCoordinateFromResponse(data: data)
+            return parseClaudeComputerUseCoordinate(from: data)
 
         } catch {
-            print("⚠️ ElementLocationDetector: request failed: \(error.localizedDescription)")
+            print("⚠️ ElementLocationDetector (Claude): request failed: \(error.localizedDescription)")
             return nil
         }
     }
 
-    /// Parses the Computer Use API response to extract click coordinates.
+    /// Parses Claude's Computer Use API response to extract click coordinates.
     /// Claude returns a `tool_use` content block with `{"action": "left_click", "coordinate": [x, y]}`.
-    /// If Claude returns text instead (no element found), returns nil.
-    private func parseCoordinateFromResponse(data: Data) -> CGPoint? {
+    private func parseClaudeComputerUseCoordinate(from data: Data) -> CGPoint? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let contentBlocks = json["content"] as? [[String: Any]] else {
-            print("⚠️ ElementLocationDetector: could not parse response JSON")
+            print("⚠️ ElementLocationDetector (Claude): could not parse response JSON")
             return nil
         }
 
-        // Look for a tool_use content block (Claude's Computer Use response format)
         for block in contentBlocks {
             guard let blockType = block["type"] as? String,
                   blockType == "tool_use",
@@ -254,25 +439,24 @@ class ElementLocationDetector {
 
             let x = CGFloat(coordinate[0].doubleValue)
             let y = CGFloat(coordinate[1].doubleValue)
-            print("🎯 ElementLocationDetector: raw coordinate (\(Int(x)), \(Int(y)))")
+            print("🎯 ElementLocationDetector (Claude): raw coordinate (\(Int(x)), \(Int(y)))")
             return CGPoint(x: x, y: y)
         }
 
-        // No tool_use block found — Claude responded with text (no element to point at)
-        print("🎯 ElementLocationDetector: no specific element detected (conceptual question)")
+        // No tool_use block — Claude responded with text (no element found)
+        print("🎯 ElementLocationDetector (Claude): no element detected")
         return nil
     }
 
-    /// Resizes screenshot data to the specified Computer Use resolution.
-    /// The target resolution should match the display's aspect ratio to avoid
-    /// distortion that degrades coordinate accuracy.
+    // MARK: - Shared Helpers
+
+    /// Resizes screenshot data to the specified resolution using exact-pixel-dimension
+    /// NSBitmapImageRep, bypassing NSImage's Retina-aware coordinate system.
     ///
-    /// **Critical Retina fix**: Uses `NSBitmapImageRep` directly instead of
-    /// `NSImage.lockFocus()`. On Retina displays (2x backing scale), lockFocus
-    /// creates a bitmap at 2× the declared size (e.g., 2560×1600 for a 1280×800
-    /// NSImage). This means the JPEG sent to Claude would be 2× larger than the
-    /// resolution declared in the Computer Use tool definition, causing Claude's
-    /// pixel-counting to return coordinates in the wrong scale.
+    /// **Critical Retina fix**: On Retina displays (2x backing scale), using
+    /// `NSImage.lockFocus()` creates a bitmap at 2× the declared size. This causes
+    /// the sent image to be 2× larger than the resolution declared in the Computer
+    /// Use tool definition, making Claude's pixel-counting return wrong-scale coordinates.
     private func resizeScreenshotForComputerUse(
         originalImageData: Data,
         targetWidth: Int,
@@ -280,9 +464,6 @@ class ElementLocationDetector {
     ) -> Data? {
         guard let originalImage = NSImage(data: originalImageData) else { return nil }
 
-        // Create a bitmap representation with exact pixel dimensions.
-        // This bypasses NSImage's Retina-aware coordinate system which would
-        // otherwise double the actual pixel count on 2x displays.
         guard let bitmapRep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: targetWidth,
@@ -298,10 +479,8 @@ class ElementLocationDetector {
             return nil
         }
 
-        // Set the point size to match pixel dimensions (1:1, no Retina scaling).
         bitmapRep.size = NSSize(width: targetWidth, height: targetHeight)
 
-        // Draw the original image into the exact-pixel-dimension bitmap
         NSGraphicsContext.saveGraphicsState()
         let graphicsContext = NSGraphicsContext(bitmapImageRep: bitmapRep)
         NSGraphicsContext.current = graphicsContext
@@ -314,11 +493,7 @@ class ElementLocationDetector {
         )
         NSGraphicsContext.restoreGraphicsState()
 
-        guard let jpegData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.85]) else {
-            return nil
-        }
-
-        return jpegData
+        return bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.85])
     }
 
     /// Detects MIME type by inspecting the first bytes of image data.
