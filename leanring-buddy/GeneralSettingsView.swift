@@ -20,10 +20,13 @@ struct GeneralSettingsView: View {
             VStack(alignment: .leading, spacing: 20) {
                 settingsHeader
                 languageSection
+                if companionManager != nil {
+                    responseTextOverlaySection
+                }
             }
             .padding(20)
         }
-        .frame(width: 400, height: 220)
+        .frame(width: 400, height: 300)
         .background(DS.Colors.background)
         .onDisappear {
             // Trigger CosyVoice2 voice ID auto-sync and reload TTS/chat clients
@@ -94,6 +97,40 @@ struct GeneralSettingsView: View {
         }
         .buttonStyle(.plain)
         .pointerCursor()
+    }
+
+    // MARK: - Response Text Overlay
+
+    private var responseTextOverlaySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(String(localized: "Display", locale: appLocale))
+
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Show Response Text")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(DS.Colors.textSecondary)
+
+                    Text("Display AI response as floating text near the cursor alongside voice audio.")
+                        .font(.system(size: 11))
+                        .foregroundColor(DS.Colors.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+
+                if let companionManager {
+                    Toggle("", isOn: Binding(
+                        get: { companionManager.isResponseTextOverlayEnabled },
+                        set: { companionManager.setResponseTextOverlayEnabled($0) }
+                    ))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .tint(DS.Colors.accent)
+                    .scaleEffect(0.8)
+                }
+            }
+        }
     }
 
     private func sectionHeader(_ title: String) -> some View {

@@ -779,6 +779,50 @@
         }
       }
     },
+    "Display" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示"
+          }
+        }
+      }
+    },
+    "Display AI response as floating text near the cursor alongside voice audio." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声と一緒に、カーソル付近にAIの応答テキストを表示します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在光标附近以浮动文字显示 AI 的回复内容，与语音同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在游標附近以浮動文字顯示 AI 的回覆內容，與語音同步。"
+          }
+        }
+      }
+    },
     "General Settings" : {
       "localizations" : {
         "ja" : {
@@ -1684,6 +1728,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定中"
+          }
+        }
+      }
+    },
+    "Show Response Text" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "応答テキストを表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显��回复文字"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示回覆文字"
           }
         }
       }

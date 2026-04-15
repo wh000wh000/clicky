@@ -210,6 +210,21 @@ final class CompanionManager: ObservableObject {
         )
     }
 
+    /// User preference for showing streaming response text near the cursor.
+    /// When enabled, AI responses are displayed as a floating text overlay
+    /// alongside TTS audio. Persisted to UserDefaults.
+    @Published var isResponseTextOverlayEnabled: Bool = UserDefaults.standard.object(forKey: "isResponseTextOverlayEnabled") == nil
+        ? true
+        : UserDefaults.standard.bool(forKey: "isResponseTextOverlayEnabled")
+
+    func setResponseTextOverlayEnabled(_ enabled: Bool) {
+        isResponseTextOverlayEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "isResponseTextOverlayEnabled")
+        if !enabled {
+            responseOverlayManager.hideOverlay()
+        }
+    }
+
     /// User preference for whether the Clicky cursor should be shown.
     /// When toggled off, the overlay is hidden and push-to-talk is disabled.
     /// Persisted to UserDefaults so the choice survives app restarts.
@@ -878,9 +893,11 @@ final class CompanionManager: ObservableObject {
 
                 // Use the appropriate chat API based on configured format.
                 // Show the response text overlay so the user can read along
-                // while TTS audio plays.
+                // while TTS audio plays (only if the user has enabled it).
                 var accumulatedStreamingText = ""
-                responseOverlayManager.showOverlayAndBeginStreaming()
+                if isResponseTextOverlayEnabled {
+                    responseOverlayManager.showOverlayAndBeginStreaming()
+                }
 
                 let fullResponseText: String
                 let chatAPIFormat = APIConfiguration.shared.effectiveChatAPIFormat
