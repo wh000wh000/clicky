@@ -1,7 +1,7 @@
 # Clicky 商业化路线图
 
-> 最后更新：2026-04-15
-> 状态：Phase 1-3 代码完成，Supabase 迁移已执行，Worker 已部署。Qwen 元素指向（tool calling）已实现，待端到端验证。
+> 最后更新：2026-04-16
+> 状态：Phase 1-3 代码完成，Supabase 迁移已执行，Worker 已部署。Qwen 元素指向（tool calling）已实现，待端到端验证。详见 `docs/dev-progress.md`。
 
 ---
 
