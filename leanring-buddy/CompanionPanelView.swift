@@ -1639,6 +1639,25 @@ struct CompanionPanelView: View {
             }
             .buttonStyle(.plain)
             .pointerCursor()
+
+            if companionManager.hasCompletedOnboarding {
+                Spacer()
+
+                Button(action: {
+                    companionManager.resetOnboarding()
+                    companionManager.triggerOnboarding()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "play.circle")
+                            .font(.system(size: 11, weight: .medium))
+                        Text("Replay Onboarding")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(DS.Colors.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .pointerCursor()
+            }
         }
     }
 

@@ -3,9 +3,9 @@
 //  leanring-buddy
 //
 //  Step-by-step text bubble onboarding system. Guides new users through
-//  4 progressive steps: welcome → voice interaction → text input → cursor
-//  popup. Each step has a completion condition that auto-advances to the
-//  next step. Progress is persisted to UserDefaults.
+//  progressive steps: welcome → demo pointing → text input → cursor popup
+//  → voice interaction. Each step has a completion condition that auto-
+//  advances to the next step. Progress is persisted to UserDefaults.
 //
 
 import Combine
@@ -13,15 +13,18 @@ import Foundation
 
 enum OnboardingStep: Int, CaseIterable {
     case welcome = 0
-    case textInput = 1
-    case cursorPopup = 2
-    case voiceInteraction = 3
-    case completed = 4
+    case demoPointing = 1
+    case textInput = 2
+    case cursorPopup = 3
+    case voiceInteraction = 4
+    case completed = 5
 
     var guideBubbleText: String {
         switch self {
         case .welcome:
             return String(localized: "hey! i'm clicky, your screen assistant. grant the permissions above to get started.", locale: appLocale)
+        case .demoPointing:
+            return String(localized: "watch this — i can see your screen!", locale: appLocale)
         case .textInput:
             return String(localized: "click the menu bar icon and type your question to get started!", locale: appLocale)
         case .cursorPopup:
@@ -43,6 +46,10 @@ final class OnboardingGuideManager: ObservableObject {
     /// The text currently displayed in the guide bubble. Updated when the
     /// step changes, streamed character-by-character for a natural feel.
     @Published var guideBubbleText: String = ""
+
+    /// Set to true when the demoPointing step finishes streaming its bubble
+    /// text, signaling CompanionManager to trigger the demo interaction.
+    @Published private(set) var isDemoPointingReadyToFire: Bool = false
 
     private var streamingTimer: Timer?
 
@@ -84,6 +91,9 @@ final class OnboardingGuideManager: ObservableObject {
         switch (currentStep, event) {
         case (.welcome, .allPermissionsGranted):
             advanceToNextStep()
+        case (.demoPointing, .demoPointingCompleted):
+            isDemoPointingReadyToFire = false
+            advanceToNextStep()
         case (.textInput, .textQuerySent):
             advanceToNextStep()
         case (.cursorPopup, .cursorPopupOpened):
@@ -99,6 +109,7 @@ final class OnboardingGuideManager: ObservableObject {
     /// wants to re-do the guide.
     func resetGuide() {
         currentStep = .welcome
+        isDemoPointingReadyToFire = false
         UserDefaults.standard.set(currentStep.rawValue, forKey: "onboardingGuideStep")
         dismissBubble()
     }
@@ -107,6 +118,7 @@ final class OnboardingGuideManager: ObservableObject {
 
     private func advanceToNextStep() {
         dismissBubble()
+        isDemoPointingReadyToFire = false
 
         guard let nextStepRawValue = OnboardingStep(rawValue: currentStep.rawValue + 1) else {
             currentStep = .completed
@@ -144,6 +156,13 @@ final class OnboardingGuideManager: ObservableObject {
         streamingTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] timer in
             guard let self, currentIndex < fullMessage.count else {
                 timer.invalidate()
+                // For the demoPointing step, signal readiness after text finishes
+                if self?.currentStep == .demoPointing {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                        guard self?.currentStep == .demoPointing else { return }
+                        self?.isDemoPointingReadyToFire = true
+                    }
+                }
                 return
             }
             let index = fullMessage.index(fullMessage.startIndex, offsetBy: currentIndex)
@@ -167,6 +186,7 @@ final class OnboardingGuideManager: ObservableObject {
 
 enum OnboardingEvent {
     case allPermissionsGranted
+    case demoPointingCompleted
     case voiceInteractionCompleted
     case textQuerySent
     case cursorPopupOpened

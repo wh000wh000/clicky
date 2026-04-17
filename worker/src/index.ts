@@ -390,31 +390,6 @@ async function fetchUserQuotaProfile(
 }
 
 /**
- * Resets the user's daily_chat_count to 0 and updates daily_chat_reset_at
- * to today. Called when the stored reset date is behind the current date.
- */
-async function resetDailyCount(
-  userId: string,
-  today: string,
-  supabaseURL: string,
-  serviceRoleKey: string
-): Promise<void> {
-  await fetch(`${supabaseURL}/rest/v1/user_profiles?id=eq.${userId}`, {
-    method: "PATCH",
-    headers: {
-      "Authorization": `Bearer ${serviceRoleKey}`,
-      "apikey": serviceRoleKey,
-      "Content-Type": "application/json",
-      "Prefer": "return=minimal",
-    },
-    body: JSON.stringify({
-      daily_chat_count: 0,
-      daily_chat_reset_at: today,
-    }),
-  });
-}
-
-/**
  * Checks whether the user is within their daily chat quota using an atomic
  * Supabase RPC (check_and_increment_chat_quota). The RPC uses SELECT ... FOR
  * UPDATE to prevent concurrent requests from bypassing the daily limit.
@@ -1078,7 +1053,10 @@ async function handleWeChatNotify(request: Request, env: Env): Promise<Response>
 }
 
 // ---------------------------------------------------------------------------
-// POST /create-checkout-session handler (Phase 4, Stripe — 路由已注释掉)
+// STRIPE — PRESERVED FOR FUTURE RE-ENABLEMENT
+// All Stripe handlers below are intentionally kept but unused. Their route
+// bindings in the main fetch() handler are commented out. Uncomment the
+// routes and configure STRIPE_* secrets to re-enable.
 // ---------------------------------------------------------------------------
 
 interface StripeEvent {

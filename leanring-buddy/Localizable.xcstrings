@@ -538,6 +538,52 @@
         }
       }
     },
+    "Display" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示"
+          }
+        }
+      }
+    },
+    "Display AI response as floating text near the cursor alongside voice audio." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声と一緒に、カーソル付近にAIの応答テキストを表示します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在光标附近以浮动文字显示 AI 的回复内容，与语音同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在游標附近以浮動文字顯示 AI 的回覆內容，與語音同步。"
+          }
+        }
+      }
+    },
     "Download" : {
       "localizations" : {
         "ja" : {
@@ -691,6 +737,94 @@
         }
       }
     },
+    "Look at where my cursor is on screen and explain what's there. Focus on the content near my cursor position — that's what I'm looking at." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面上のカーソル位置にあるものを説明してください。カーソル付近のコンテンツに注目してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看我光标所在的屏幕位置，解释一下那里的内容。重点关注光标附近的内容——那是我正在看的东西。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看我游標所在的螢幕位置，解釋一下那裡的內容。重點關注游標附近的內容——那是我正在看的東西。"
+          }
+        }
+      }
+    },
+    "Summarize the main content visible on my screen. Be concise but capture the key points." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面に表示されているメインコンテンツを要約してください。簡潔にしつつ、重要なポイントを押さえてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "总结我屏幕上可见的主要内容。简明扼要，但要抓住要点。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "總結我螢幕上可見的主要內容。簡明扼要，但要抓住要點。"
+          }
+        }
+      }
+    },
+    "Look at what I'm writing on screen and help me improve it. Suggest better wording, fix any issues, and make it clearer." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面上で書いている内容を見て、改善を手伝ってください。より良い表現を提案し、問題を修正し、より明確にしてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看我在屏幕上写的内容，帮我改进。建议更好的措辞，修复问题，让它更清晰。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看我在螢幕上寫的內容，幫我改進。建議更好的措辭，修復問題，讓它更清晰。"
+          }
+        }
+      }
+    },
+    "Look at the code or error near my cursor on screen. Explain what's wrong and how to fix it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面上のカーソル付近のコードやエラーを見てください。何が問題でどう修正すればいいか説明してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看我屏幕上光标附近的代码或错误。解释哪里出了问题以及如何修复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看我螢幕上游標附近的程式碼或錯誤。解釋哪裡出了問題以及如何修復。"
+          }
+        }
+      }
+    },
     "Find App" : {
       "localizations" : {
         "ja" : {
@@ -775,50 +909,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "找到啦！"
-          }
-        }
-      }
-    },
-    "Display" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "表示"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "顯示"
-          }
-        }
-      }
-    },
-    "Display AI response as floating text near the cursor alongside voice audio." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "音声と一緒に、カーソル付近にAIの応答テキストを表示します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在光标附近以浮动文字显示 AI 的回复内容，与语音同步。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在游標附近以浮動文字顯示 AI 的回覆內容，與語音同步。"
           }
         }
       }
@@ -1072,6 +1162,7 @@
 
     },
     "I'm all out of credits. Please DM Farza and tell him to bring me back to life." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1622,6 +1713,28 @@
     "Retry Download" : {
 
     },
+    "Replay Onboarding" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンボーディングを再生"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新体验引导"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新體驗引導"
+          }
+        }
+      }
+    },
     "Review code" : {
       "localizations" : {
         "ja" : {
@@ -1732,28 +1845,6 @@
         }
       }
     },
-    "Show Response Text" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "応答テキストを表示"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显��回复文字"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "顯示回覆文字"
-          }
-        }
-      }
-    },
     "Show Clicky" : {
       "localizations" : {
         "ja" : {
@@ -1772,6 +1863,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示 Clicky"
+          }
+        }
+      }
+    },
+    "Show Response Text" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "応答テキストを表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显��回复文字"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示回覆文字"
           }
         }
       }
@@ -1961,6 +2075,50 @@
     },
     "Too many requests. Please wait a moment and try again." : {
 
+    },
+    "watch this — i can see your screen!" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見ててね — 画面が見えるよ！"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看好了——我能看到你的屏幕！"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看好了——我能看到你的螢幕！"
+          }
+        }
+      }
+    },
+    "look around my screen and find something interesting to point at" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面を見回して、指さすのに面白いものを見つけて"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看我的屏幕，找一个有趣的东西指给我看"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看看我的螢幕，找一個有趣的東西指給我看"
+          }
+        }
+      }
     },
     "try cmd+shift+space to open a quick panel right at your cursor!" : {
       "localizations" : {

@@ -82,6 +82,13 @@ struct NavigationBubbleSizePreferenceKey: PreferenceKey {
     }
 }
 
+struct ResponseBubbleSizePreferenceKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
 /// The buddy's behavioral mode. Controls whether it follows the cursor,
 /// is flying toward a detected UI element, or is pointing at an element.
 enum BuddyNavigationMode {
@@ -140,6 +147,7 @@ struct BlueCursorView: View {
     @State private var navigationBubbleText: String = ""
     @State private var navigationBubbleOpacity: Double = 0.0
     @State private var navigationBubbleSize: CGSize = .zero
+    @State private var responseBubbleSize: CGSize = .zero
 
     /// The cursor position at the moment navigation started, used to detect
     /// if the user moves the cursor enough to cancel the navigation.
@@ -233,6 +241,38 @@ struct BlueCursorView: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0), value: cursorPosition)
                     .animation(.easeInOut(duration: 0.4), value: companionManager.onboardingGuideManager.guideBubbleOpacity)
                     .allowsHitTesting(false)
+            }
+
+            // AI response text bubble — shows the streaming AI response near
+            // the cursor so the user can read along while TTS plays. The bubble's
+            // top-left corner aligns with the cursor center by default; near screen
+            // edges it flips direction to stay fully visible.
+            if isCursorOnThisScreen && !companionManager.streamingResponseText.isEmpty && buddyNavigationMode == .followingCursor {
+                Text(companionManager.streamingResponseText)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 260, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(DS.Colors.overlayCursorBlue.opacity(0.9))
+                            .shadow(color: DS.Colors.overlayCursorBlue.opacity(0.4), radius: 8, x: 0, y: 2)
+                    )
+                    .overlay(
+                        GeometryReader { geo in
+                            Color.clear
+                                .preference(key: ResponseBubbleSizePreferenceKey.self, value: geo.size)
+                        }
+                    )
+                    .position(responseBubblePosition())
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0), value: cursorPosition)
+                    .allowsHitTesting(false)
+                    .onPreferenceChange(ResponseBubbleSizePreferenceKey.self) { newSize in
+                        responseBubbleSize = newSize
+                    }
             }
 
             // Navigation pointer bubble — shown when buddy arrives at a detected element.
@@ -436,6 +476,51 @@ struct BlueCursorView: View {
         let x = screenPoint.x - screenFrame.origin.x
         let y = (screenFrame.origin.y + screenFrame.height) - screenPoint.y
         return CGPoint(x: x, y: y)
+    }
+
+    /// Computes the `.position()` center point for the AI response bubble so
+    /// that the bubble's top-left corner aligns with the cursor center by default
+    /// (placing the bubble below-right of the cursor without overlapping it).
+    /// Near screen edges the bubble flips direction to stay fully visible.
+    private func responseBubblePosition() -> CGPoint {
+        let bubbleWidth = responseBubbleSize.width
+        let bubbleHeight = responseBubbleSize.height
+        let edgeMargin: CGFloat = 12
+        // Small gap between cursor center and bubble edge
+        let cursorGap: CGFloat = 8
+
+        // Decide horizontal placement: default right, flip left near right edge
+        let spaceOnRight = screenFrame.width - cursorPosition.x
+        let needsFlipHorizontal = spaceOnRight < (bubbleWidth + cursorGap + edgeMargin)
+
+        // Decide vertical placement: default below, flip above near bottom edge
+        let spaceBelow = screenFrame.height - cursorPosition.y
+        let needsFlipVertical = spaceBelow < (bubbleHeight + cursorGap + edgeMargin)
+
+        let posX: CGFloat
+        if needsFlipHorizontal {
+            // Bubble extends leftward: right edge at cursor - gap
+            posX = cursorPosition.x - cursorGap - (bubbleWidth / 2)
+        } else {
+            // Bubble extends rightward: left edge at cursor + gap
+            posX = cursorPosition.x + cursorGap + (bubbleWidth / 2)
+        }
+
+        let posY: CGFloat
+        if needsFlipVertical {
+            // Bubble extends upward: bottom edge at cursor - gap
+            posY = cursorPosition.y - cursorGap - (bubbleHeight / 2)
+        } else {
+            // Bubble extends downward: top edge at cursor + gap
+            posY = cursorPosition.y + cursorGap + (bubbleHeight / 2)
+        }
+
+        // Final clamp: ensure the bubble never goes off-screen even in extreme
+        // corners (e.g. cursor at the very bottom-right pixel).
+        let clampedX = max(edgeMargin + bubbleWidth / 2, min(posX, screenFrame.width - edgeMargin - bubbleWidth / 2))
+        let clampedY = max(edgeMargin + bubbleHeight / 2, min(posY, screenFrame.height - edgeMargin - bubbleHeight / 2))
+
+        return CGPoint(x: clampedX, y: clampedY)
     }
 
     // MARK: - Element Navigation

@@ -59,9 +59,10 @@ final class CompanionManager: ObservableObject {
     let globalPushToTalkShortcutMonitor = GlobalPushToTalkShortcutMonitor()
     let overlayWindowManager = OverlayWindowManager()
     let onboardingGuideManager = OnboardingGuideManager()
-    /// Floating overlay that displays streaming response text near the cursor
-    /// so the user can read Claude's explanation alongside the TTS audio.
-    let responseOverlayManager = CompanionResponseOverlayManager()
+    /// Streaming AI response text displayed in the blue cursor's speech bubble.
+    /// Updated progressively as SSE chunks arrive; cleared after TTS finishes.
+    @Published var streamingResponseText: String = ""
+    private var responseTextClearTask: Task<Void, Never>?
 
     /// Manages the cursor-following text input popup (Cmd+Shift+Space).
     lazy var cursorInputPopupManager: CursorInputPopupManager = {
@@ -135,6 +136,7 @@ final class CompanionManager: ObservableObject {
     private var voiceStateCancellable: AnyCancellable?
     private var audioPowerCancellable: AnyCancellable?
     private var whisperKitModelStateCancellable: AnyCancellable?
+    private var demoPointingReadyCancellable: AnyCancellable?
     private var accessibilityCheckTimer: Timer?
     private var pendingKeyboardShortcutStartTask: Task<Void, Never>?
     /// Scheduled hide for transient cursor mode — cancelled if the user
@@ -173,25 +175,25 @@ final class CompanionManager: ObservableObject {
                 id: "explain",
                 label: String(localized: "Explain this", locale: appLocale),
                 iconName: "questionmark.circle",
-                promptText: "Look at where my cursor is on screen and explain what's there. Focus on the content near my cursor position — that's what I'm looking at."
+                promptText: String(localized: "Look at where my cursor is on screen and explain what's there. Focus on the content near my cursor position — that's what I'm looking at.", locale: appLocale)
             ),
             QuickActionPreset(
                 id: "summarize",
                 label: String(localized: "Summarize", locale: appLocale),
                 iconName: "doc.text",
-                promptText: "Summarize the main content visible on my screen. Be concise but capture the key points."
+                promptText: String(localized: "Summarize the main content visible on my screen. Be concise but capture the key points.", locale: appLocale)
             ),
             QuickActionPreset(
                 id: "help-write",
                 label: String(localized: "Help me write", locale: appLocale),
                 iconName: "pencil.line",
-                promptText: "Look at what I'm writing on screen and help me improve it. Suggest better wording, fix any issues, and make it clearer."
+                promptText: String(localized: "Look at what I'm writing on screen and help me improve it. Suggest better wording, fix any issues, and make it clearer.", locale: appLocale)
             ),
             QuickActionPreset(
                 id: "debug",
                 label: String(localized: "Debug this", locale: appLocale),
                 iconName: "ladybug",
-                promptText: "Look at the code or error near my cursor on screen. Explain what's wrong and how to fix it."
+                promptText: String(localized: "Look at the code or error near my cursor on screen. Explain what's wrong and how to fix it.", locale: appLocale)
             ),
         ]
     }
@@ -208,21 +210,6 @@ final class CompanionManager: ObservableObject {
             for: sceneContext,
             defaultPresets: quickActionPresets
         )
-    }
-
-    /// User preference for showing streaming response text near the cursor.
-    /// When enabled, AI responses are displayed as a floating text overlay
-    /// alongside TTS audio. Persisted to UserDefaults.
-    @Published var isResponseTextOverlayEnabled: Bool = UserDefaults.standard.object(forKey: "isResponseTextOverlayEnabled") == nil
-        ? true
-        : UserDefaults.standard.bool(forKey: "isResponseTextOverlayEnabled")
-
-    func setResponseTextOverlayEnabled(_ enabled: Bool) {
-        isResponseTextOverlayEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "isResponseTextOverlayEnabled")
-        if !enabled {
-            responseOverlayManager.hideOverlay()
-        }
     }
 
     /// User preference for whether the Clicky cursor should be shown.
@@ -281,8 +268,9 @@ final class CompanionManager: ObservableObject {
         bindWhisperKitModelState()
         bindShortcutTransitions()
         bindTextInputShortcut()
+        bindDemoPointingTrigger()
         // Eagerly touch the Claude API so its TLS warmup handshake completes
-        // well before the onboarding demo fires at ~40s into the video.
+        // well before the onboarding demo fires.
         _ = claudeAPI
 
         // Rebuild overlay windows whenever the display configuration changes
@@ -343,13 +331,21 @@ final class CompanionManager: ObservableObject {
         detectedElementScreenLocation = nil
         detectedElementDisplayFrame = nil
         detectedElementBubbleText = nil
+
+        // If the onboarding demo pointing step is active, the pointing
+        // animation just finished — notify so the guide advances.
+        if onboardingGuideManager.currentStep == .demoPointing {
+            onboardingGuideManager.notifyEvent(.demoPointingCompleted)
+        }
     }
 
     func stop() {
         globalPushToTalkShortcutMonitor.stop()
         buddyDictationManager.cancelCurrentDictation()
+        demoPointingReadyCancellable?.cancel()
         overlayWindowManager.hideOverlay()
         transientHideTask?.cancel()
+        responseTextClearTask?.cancel()
 
         currentResponseTask?.cancel()
         currentResponseTask = nil
@@ -791,7 +787,7 @@ final class CompanionManager: ObservableObject {
     /// language instruction so Claude responds in the language selected in settings.
     private var companionVoiceResponseSystemPrompt: String {
         let languageInstruction = LocalizationManager.shared.currentLanguage.claudeResponseLanguageInstruction
-        return Self.companionVoiceResponseBaseSystemPrompt + "\n\nlanguage: \(languageInstruction)"
+        return "CRITICAL: \(languageInstruction). every word of your reply must be in this language, no exceptions.\n\n" + Self.companionVoiceResponseBaseSystemPrompt + "\n\nlanguage reminder: \(languageInstruction)"
     }
 
     // MARK: - OpenAI-Compatible Path (Qwen) — Tool Calling for Element Pointing
@@ -833,7 +829,7 @@ final class CompanionManager: ObservableObject {
     /// The effective system prompt for the OpenAI-compatible (Qwen) path.
     private var companionVoiceResponseSystemPromptOpenAI: String {
         let languageInstruction = LocalizationManager.shared.currentLanguage.claudeResponseLanguageInstruction
-        return Self.companionVoiceResponseBaseSystemPromptOpenAI + "\n\nlanguage: \(languageInstruction)"
+        return "CRITICAL: \(languageInstruction). every word of your reply must be in this language, no exceptions.\n\n" + Self.companionVoiceResponseBaseSystemPromptOpenAI + "\n\nlanguage reminder: \(languageInstruction)"
     }
 
     /// OpenAI-format tool definition for element pointing. Coordinates use
@@ -864,6 +860,37 @@ final class CompanionManager: ObservableObject {
         ] as [String: Any]
     ]
 
+    // MARK: - Cursor Region Description
+
+    /// Returns a human-readable region description for cursor pixel coordinates
+    /// relative to a screenshot. Divides the screen into a 3×3 grid to produce
+    /// terms like "top-left area", "center", "bottom-right area". Used to give
+    /// the AI a spatial hint so it prioritizes content near the cursor.
+    private static func cursorRegionDescription(pixelX: Int, pixelY: Int, imageWidth: Int, imageHeight: Int) -> String {
+        let xFraction = Double(pixelX) / Double(max(imageWidth, 1))
+        let yFraction = Double(pixelY) / Double(max(imageHeight, 1))
+
+        let horizontal: String
+        if xFraction < 0.33 { horizontal = "left" }
+        else if xFraction > 0.66 { horizontal = "right" }
+        else { horizontal = "center" }
+
+        let vertical: String
+        if yFraction < 0.33 { vertical = "top" }
+        else if yFraction > 0.66 { vertical = "bottom" }
+        else { vertical = "middle" }
+
+        if horizontal == "center" && vertical == "middle" {
+            return "center of the screen"
+        } else if horizontal == "center" {
+            return "\(vertical) area of the screen"
+        } else if vertical == "middle" {
+            return "\(horizontal) side of the screen"
+        } else {
+            return "\(vertical)-\(horizontal) area of the screen"
+        }
+    }
+
     // MARK: - AI Response Pipeline
 
     /// Sends a text query to Claude with a screenshot of the user's screen(s).
@@ -881,6 +908,7 @@ final class CompanionManager: ObservableObject {
         // Cancel any in-progress response and TTS from a previous utterance
         currentResponseTask?.cancel()
         elevenLabsTTSClient.stopPlayback()
+        openAICompatibleTTSClient.stopPlayback()
         clearDetectedElementLocation()
 
         // Cancel any pending transient hide so the overlay stays visible
@@ -907,7 +935,7 @@ final class CompanionManager: ObservableObject {
     private func sendTranscriptToClaudeWithScreenshot(transcript: String) {
         currentResponseTask?.cancel()
         elevenLabsTTSClient.stopPlayback()
-        responseOverlayManager.hideOverlay()
+        streamingResponseText = ""
 
         currentResponseTask = Task {
             // Stay in processing (spinner) state while waiting for Claude's response
@@ -963,6 +991,23 @@ final class CompanionManager: ObservableObject {
                     return (data: capture.imageData, label: label)
                 }
 
+                // Build a cursor-context-enriched user prompt so the AI strongly
+                // prioritizes the area near the user's real mouse pointer. The region
+                // description (e.g. "top-left area") makes spatial focus explicit.
+                var cursorEnrichedTranscript = transcript
+                if let cursorCapture = effectiveCaptures.first(where: { $0.isCursorScreen }) {
+                    let localX = mouseLocation.x - cursorCapture.displayFrame.origin.x
+                    let localY = (cursorCapture.displayFrame.origin.y + cursorCapture.displayFrame.height) - mouseLocation.y
+                    let pixelX = Int(localX * CGFloat(cursorCapture.screenshotWidthInPixels) / cursorCapture.displayFrame.width)
+                    let pixelY = Int(localY * CGFloat(cursorCapture.screenshotHeightInPixels) / cursorCapture.displayFrame.height)
+                    let regionDescription = Self.cursorRegionDescription(
+                        pixelX: pixelX, pixelY: pixelY,
+                        imageWidth: cursorCapture.screenshotWidthInPixels,
+                        imageHeight: cursorCapture.screenshotHeightInPixels
+                    )
+                    cursorEnrichedTranscript = "[my cursor is at the \(regionDescription), near pixel (\(pixelX), \(pixelY)). prioritize explaining what's near my cursor.]\n\n\(transcript)"
+                }
+
                 // Pass conversation history so Claude remembers prior exchanges
                 let historyForAPI = conversationHistory.map { entry in
                     (userPlaceholder: entry.userTranscript, assistantResponse: entry.assistantResponse)
@@ -971,9 +1016,7 @@ final class CompanionManager: ObservableObject {
                 // Use the appropriate chat API based on configured format.
                 // Show the response text overlay so the user can read along
                 // while TTS audio plays (only if the user has enabled it).
-                if isResponseTextOverlayEnabled {
-                    responseOverlayManager.showOverlayAndBeginStreaming()
-                }
+                streamingResponseText = ""
 
                 var fullResponseText: String
                 var qwenPointingToolCall: ParsedToolCall? = nil
@@ -983,14 +1026,14 @@ final class CompanionManager: ObservableObject {
                         images: labeledImages,
                         systemPrompt: systemPromptWithContext,
                         conversationHistory: historyForAPI,
-                        userPrompt: transcript,
+                        userPrompt: cursorEnrichedTranscript,
                         tools: [Self.pointAtElementToolDefinition],
                         bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
                             ? await SupabaseAuthManager.shared.validAccessToken()
                             : nil,
                         onTextChunk: { [weak self] accumulatedText in
                             // onTextChunk passes the full accumulated text so far, not a delta
-                            self?.responseOverlayManager.updateStreamingText(accumulatedText)
+                            self?.streamingResponseText = accumulatedText
                         }
                     )
                     fullResponseText = responseText
@@ -1000,13 +1043,13 @@ final class CompanionManager: ObservableObject {
                         images: labeledImages,
                         systemPrompt: systemPromptWithContext,
                         conversationHistory: historyForAPI,
-                        userPrompt: transcript,
+                        userPrompt: cursorEnrichedTranscript,
                         bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
-                            ? SupabaseAuthManager.shared.currentSession?.accessToken
+                            ? await SupabaseAuthManager.shared.validAccessToken()
                             : nil,
                         onTextChunk: { [weak self] accumulatedText in
                             // onTextChunk passes the full accumulated text so far, not a delta
-                            self?.responseOverlayManager.updateStreamingText(accumulatedText)
+                            self?.streamingResponseText = accumulatedText
                         }
                     )
                     fullResponseText = responseText
@@ -1017,7 +1060,7 @@ final class CompanionManager: ObservableObject {
                 print("⏱ Pipeline: Claude API done in \(apiElapsedMs)ms (sent \(labeledImages.count) image(s), \(imageDataSizeKB)KB total)")
 
                 guard !Task.isCancelled else {
-                    responseOverlayManager.hideOverlay()
+                    streamingResponseText = ""
                     return
                 }
 
@@ -1059,7 +1102,7 @@ final class CompanionManager: ObservableObject {
                 }
 
                 // Update the overlay with the clean text (POINT tag stripped)
-                responseOverlayManager.updateStreamingText(spokenText)
+                streamingResponseText = spokenText
 
                 // Pick the target screen — cursor screen by default, or the
                 // screen number specified in a [POINT:] tag.
@@ -1107,6 +1150,7 @@ final class CompanionManager: ObservableObject {
                     voiceState = .idle
                     detectedElementScreenLocation = globalLocation
                     detectedElementDisplayFrame = displayFrame
+                    detectedElementBubbleText = elementLabel
 
                     // Optional background refinement via ElementLocationDetector
                     if let detector = elementLocationDetector,
@@ -1164,6 +1208,7 @@ final class CompanionManager: ObservableObject {
                     voiceState = .idle
                     detectedElementScreenLocation = claudeGlobalLocation
                     detectedElementDisplayFrame = displayFrame
+                    detectedElementBubbleText = parseResult.elementLabel
 
                     if let detector = elementLocationDetector,
                        let elementLabel = parseResult.elementLabel,
@@ -1230,7 +1275,7 @@ final class CompanionManager: ObservableObject {
                             try await elevenLabsTTSClient.speakText(
                                 spokenText,
                                 bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
-                                    ? SupabaseAuthManager.shared.currentSession?.accessToken
+                                    ? await SupabaseAuthManager.shared.validAccessToken()
                                     : nil
                             )
                         }
@@ -1239,25 +1284,27 @@ final class CompanionManager: ObservableObject {
                         print("⏱ Pipeline: TTS ready in \(ttsElapsedMs)ms (total from start)")
                         voiceState = .responding
                         // Begin auto-hide countdown for the text overlay
-                        responseOverlayManager.finishStreaming()
+                        scheduleResponseTextAutoClear()
                     } catch {
                         ClickyAnalytics.trackTTSError(error: error.localizedDescription)
                         print("⚠️ TTS error: \(error)")
-                        responseOverlayManager.finishStreaming()
+                        scheduleResponseTextAutoClear()
                         speakContextualErrorFallback(error)
                     }
                 } else {
                     // No spoken text — hide the overlay immediately
-                    responseOverlayManager.finishStreaming()
+                    scheduleResponseTextAutoClear()
                 }
             } catch is CancellationError {
                 // User spoke again — response was interrupted
-                responseOverlayManager.hideOverlay()
+                streamingResponseText = ""
+                responseTextClearTask?.cancel()
             } catch let quotaError as ChatQuotaExceededError {
                 // 429 daily_limit_exceeded: show a panel banner instead of
                 // speaking the credits-error fallback, since the user is not
                 // "out of credits" — they just need to wait until tomorrow.
-                responseOverlayManager.hideOverlay()
+                streamingResponseText = ""
+                responseTextClearTask?.cancel()
                 isQuotaExceeded = true
                 voiceState = .idle
                 print("⚠️ Quota exceeded: \(quotaError.message)")
@@ -1268,14 +1315,16 @@ final class CompanionManager: ObservableObject {
                 // TCC permission was revoked (e.g. new Xcode build
                 // invalidated the signing identity). Reset in-memory
                 // permission state so the panel shows Grant buttons.
-                responseOverlayManager.hideOverlay()
+                streamingResponseText = ""
+                responseTextClearTask?.cancel()
                 print("⚠️ Screen capture TCC denied (code \(nsError.code)) — resetting permission state")
                 hasScreenContentPermission = false
                 hasScreenRecordingPermission = false
                 voiceState = .idle
                 speakScreenPermissionErrorFallback()
             } catch {
-                responseOverlayManager.hideOverlay()
+                streamingResponseText = ""
+                responseTextClearTask?.cancel()
                 ClickyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
                 speakContextualErrorFallback(error)
@@ -1319,21 +1368,27 @@ final class CompanionManager: ObservableObject {
         }
     }
 
+    /// Clears the streaming response text after TTS finishes playing,
+    /// with an extra delay so the user can finish reading.
+    private func scheduleResponseTextAutoClear() {
+        responseTextClearTask?.cancel()
+        responseTextClearTask = Task {
+            // Wait for TTS audio to finish playing
+            while elevenLabsTTSClient.isPlaying || openAICompatibleTTSClient.isPlaying {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled else { return }
+            }
+            // Keep text visible for a few more seconds after TTS ends
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            streamingResponseText = ""
+        }
+    }
+
     /// Speaks a short message when screen capture permission is denied,
     /// telling the user to re-grant access in System Settings.
     private func speakScreenPermissionErrorFallback() {
         let utterance = String(localized: "I can't see your screen right now. Please open the Clicky panel and re-grant screen recording permission.", locale: appLocale)
-        let voiceIdentifier = LocalizationManager.shared.currentLanguage.nsSpeechSynthesizerVoiceIdentifier
-        let synthesizer = NSSpeechSynthesizer(voice: NSSpeechSynthesizer.VoiceName(rawValue: voiceIdentifier)) ?? NSSpeechSynthesizer()
-        synthesizer.startSpeaking(utterance)
-        voiceState = .responding
-    }
-
-    /// Speaks a hardcoded error message using macOS system TTS when API
-    /// credits run out (proxy mode only). Uses NSSpeechSynthesizer so it
-    /// works even when ElevenLabs is down.
-    private func speakCreditsErrorFallback() {
-        let utterance = String(localized: "I'm all out of credits. Please DM Farza and tell him to bring me back to life.", locale: appLocale)
         let voiceIdentifier = LocalizationManager.shared.currentLanguage.nsSpeechSynthesizerVoiceIdentifier
         let synthesizer = NSSpeechSynthesizer(voice: NSSpeechSynthesizer.VoiceName(rawValue: voiceIdentifier)) ?? NSSpeechSynthesizer()
         synthesizer.startSpeaking(utterance)
@@ -1454,14 +1509,197 @@ final class CompanionManager: ObservableObject {
         )
     }
 
-    // Onboarding video, music, and demo interaction have been removed.
-    // Onboarding is now handled by OnboardingGuideManager with step-by-step
-    // text bubble guidance.
+    // MARK: - Demo Pointing Trigger
 
-    /// Placeholder kept for BlueCursorView compatibility — no longer triggers
-    /// a video-based demo. The guide system handles onboarding instead.
+    /// Observes OnboardingGuideManager.isDemoPointingReadyToFire and
+    /// automatically triggers the demo interaction when the guide signals.
+    private func bindDemoPointingTrigger() {
+        demoPointingReadyCancellable = onboardingGuideManager.$isDemoPointingReadyToFire
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isReady in
+                guard isReady else { return }
+                self?.performOnboardingDemoInteraction()
+            }
+    }
+
+    // MARK: - Onboarding Demo Interaction
+
+    /// System prompt for the onboarding demo. Asks the AI to find one
+    /// specific element near the center of the screen and make a short,
+    /// playful observation about it.
+    private var onboardingDemoSystemPrompt: String {
+        let languageInstruction = LocalizationManager.shared.currentLanguage.claudeResponseLanguageInstruction
+        let chatAPIFormat = APIConfiguration.shared.effectiveChatAPIFormat
+
+        let sharedPreamble = """
+        CRITICAL: \(languageInstruction). every word of your reply must be in this language, no exceptions.
+
+        you're clicky, a small blue cursor buddy living on the user's screen. you're showing off during onboarding — look at their screen and find ONE specific, concrete thing to point at. pick something with a clear name or identity: a specific app icon (say its name), a specific word or phrase of text you can read, a specific filename, a specific button label, a specific tab title, a specific image you can describe. do NOT point at vague things like "a window" or "some text" — be specific about exactly what you see.
+
+        make a short quirky 3-6 word observation about the specific thing you picked — something fun, playful, or curious that shows you actually read/recognized it. no emojis ever. NEVER quote or repeat text you see on screen — just react to it. keep it to 6 words max, no exceptions.
+
+        CRITICAL COORDINATE RULE: you MUST only pick elements near the CENTER of the screen. do NOT pick anything near the edges of the screen. no menu bar items, no dock icons, no sidebar items, no items near any edge. only things clearly in the middle area of the screen. if the only interesting things are near the edges, pick something boring in the center instead.
+
+        respond with ONLY your short comment plus the coordinate. nothing else. all lowercase.
+        """
+
+        let pointingInstruction: String
+        if chatAPIFormat == .openaiCompatible {
+            // Qwen path: use tool calling with 0–1000 normalized coordinates.
+            // The coordinate rule maps to 200–800 in the 0–1000 range.
+            pointingInstruction = """
+
+            to point, call the point_at_element tool with x and y coordinates (0–1000 normalized range, where 0,0 is top-left and 1000,1000 is bottom-right). your coordinates must be between 200–800 for both x and y. also provide your short comment as normal text content alongside the tool call.
+            """
+        } else {
+            // Claude path: use [POINT:x,y:label] text tags with pixel coordinates.
+            // The coordinate rule maps to 20%–80% of image dimensions.
+            pointingInstruction = """
+
+            your x coordinate must be between 20%-80% of the image width. your y coordinate must be between 20%-80% of the image height.
+
+            format: your comment [POINT:x,y:label]
+
+            the screenshot images are labeled with their pixel dimensions. use those dimensions as the coordinate space. origin (0,0) is top-left. x increases rightward, y increases downward.
+            """
+        }
+
+        return sharedPreamble + pointingInstruction + "\n\nlanguage reminder: \(languageInstruction)"
+    }
+
+    /// Captures a screenshot and asks the AI to find something interesting to
+    /// point at, then triggers the buddy's flight animation. Used during
+    /// onboarding to demo the pointing feature.
     func performOnboardingDemoInteraction() {
-        // No-op: onboarding demo removed. Kept as empty stub for
-        // BlueCursorView compatibility.
+        // Don't interrupt an active voice response
+        guard voiceState == .idle || voiceState == .responding else {
+            // If busy, skip the demo and advance onboarding
+            onboardingGuideManager.notifyEvent(.demoPointingCompleted)
+            return
+        }
+
+        Task {
+            do {
+                let screenCaptures = try await CompanionScreenCaptureUtility.captureAllScreensAsJPEG()
+
+                // Only send the cursor screen so the AI can't pick something
+                // on a different monitor that we can't point at.
+                guard let cursorScreenCapture = screenCaptures.first(where: { $0.isCursorScreen }) else {
+                    print("🎯 Onboarding demo: no cursor screen found")
+                    onboardingGuideManager.notifyEvent(.demoPointingCompleted)
+                    return
+                }
+
+                let dimensionInfo = " (image dimensions: \(cursorScreenCapture.screenshotWidthInPixels)x\(cursorScreenCapture.screenshotHeightInPixels) pixels)"
+                let labeledImages = [(data: cursorScreenCapture.imageData, label: cursorScreenCapture.label + dimensionInfo)]
+
+                let demoUserPrompt = String(localized: "look around my screen and find something interesting to point at", locale: appLocale)
+
+                let chatAPIFormat = APIConfiguration.shared.effectiveChatAPIFormat
+
+                var fullResponseText: String
+                var qwenToolCall: ParsedToolCall? = nil
+
+                if chatAPIFormat == .openaiCompatible {
+                    let (responseText, toolCall, _) = try await openAICompatibleChatAPI.analyzeImageStreaming(
+                        images: labeledImages,
+                        systemPrompt: onboardingDemoSystemPrompt,
+                        userPrompt: demoUserPrompt,
+                        tools: [Self.pointAtElementToolDefinition],
+                        bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
+                            ? await SupabaseAuthManager.shared.validAccessToken()
+                            : nil,
+                        onTextChunk: { _ in }
+                    )
+                    fullResponseText = responseText
+                    qwenToolCall = toolCall
+                } else {
+                    let (responseText, _) = try await claudeAPI.analyzeImageStreaming(
+                        images: labeledImages,
+                        systemPrompt: onboardingDemoSystemPrompt,
+                        userPrompt: demoUserPrompt,
+                        bearerToken: APIConfiguration.shared.chatAPIMode == .proxy
+                            ? await SupabaseAuthManager.shared.validAccessToken()
+                            : nil,
+                        onTextChunk: { _ in }
+                    )
+                    fullResponseText = responseText
+                }
+
+                let parseResult = Self.parsePointingCoordinates(from: fullResponseText)
+
+                // Try Qwen tool call first, then Claude text tag
+                var globalLocation: CGPoint? = nil
+                var bubbleText: String? = parseResult.spokenText
+
+                if let toolCall = qwenToolCall,
+                   toolCall.name == "point_at_element",
+                   let argsData = toolCall.argumentsJSON.data(using: .utf8),
+                   let args = try? JSONSerialization.jsonObject(with: argsData) as? [String: Any],
+                   let x1000 = (args["x"] as? Int) ?? (args["x"] as? Double).map({ Int($0) }),
+                   let y1000 = (args["y"] as? Int) ?? (args["y"] as? Double).map({ Int($0) }) {
+
+                    let displayWidth = CGFloat(cursorScreenCapture.displayWidthInPoints)
+                    let displayHeight = CGFloat(cursorScreenCapture.displayHeightInPoints)
+                    let displayFrame = cursorScreenCapture.displayFrame
+
+                    let clampedX = max(0, min(x1000, 1000))
+                    let clampedY = max(0, min(y1000, 1000))
+                    let displayLocalX = (Double(clampedX) / 1000.0) * Double(displayWidth)
+                    let displayLocalYTopLeft = (Double(clampedY) / 1000.0) * Double(displayHeight)
+                    let appKitLocalY = Double(displayHeight) - displayLocalYTopLeft
+
+                    globalLocation = CGPoint(
+                        x: displayLocalX + Double(displayFrame.origin.x),
+                        y: appKitLocalY + Double(displayFrame.origin.y)
+                    )
+
+                    // Use the text response as bubble text; fallback to label
+                    if fullResponseText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        bubbleText = args["label"] as? String
+                    }
+
+                    print("🎯 Onboarding demo (Qwen): pointing at (\(x1000),\(y1000))/1000 — \"\(bubbleText ?? "")\"")
+
+                } else if let pointCoordinate = parseResult.coordinate {
+                    // Claude text tag path
+                    let screenshotWidth = CGFloat(cursorScreenCapture.screenshotWidthInPixels)
+                    let screenshotHeight = CGFloat(cursorScreenCapture.screenshotHeightInPixels)
+                    let displayWidth = CGFloat(cursorScreenCapture.displayWidthInPoints)
+                    let displayHeight = CGFloat(cursorScreenCapture.displayHeightInPoints)
+                    let displayFrame = cursorScreenCapture.displayFrame
+
+                    let clampedX = max(0, min(pointCoordinate.x, screenshotWidth))
+                    let clampedY = max(0, min(pointCoordinate.y, screenshotHeight))
+                    let displayLocalX = clampedX * (displayWidth / screenshotWidth)
+                    let displayLocalY = clampedY * (displayHeight / screenshotHeight)
+                    let appKitY = displayHeight - displayLocalY
+
+                    globalLocation = CGPoint(
+                        x: displayLocalX + displayFrame.origin.x,
+                        y: appKitY + displayFrame.origin.y
+                    )
+
+                    print("🎯 Onboarding demo (Claude): pointing at \"\(parseResult.elementLabel ?? "element")\" — \"\(bubbleText ?? "")\"")
+                }
+
+                guard let targetLocation = globalLocation else {
+                    print("🎯 Onboarding demo: no element to point at")
+                    onboardingGuideManager.notifyEvent(.demoPointingCompleted)
+                    return
+                }
+
+                // Set custom bubble text so the pointing animation uses the
+                // AI's comment instead of a random phrase
+                detectedElementBubbleText = bubbleText
+                detectedElementScreenLocation = targetLocation
+                detectedElementDisplayFrame = cursorScreenCapture.displayFrame
+
+            } catch {
+                print("⚠️ Onboarding demo error: \(error)")
+                // On failure, skip the demo and advance onboarding
+                onboardingGuideManager.notifyEvent(.demoPointingCompleted)
+            }
+        }
     }
 }

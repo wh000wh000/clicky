@@ -52,34 +52,45 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `leanring_buddyApp.swift` | ~89 | Menu bar app entry point. Uses `@NSApplicationDelegateAdaptor` with `CompanionAppDelegate` which creates `MenuBarPanelManager` and starts `CompanionManager`. No main window — the app lives entirely in the status bar. |
-| `CompanionManager.swift` | ~1026 | Central state machine. Owns dictation, shortcut monitoring, screen capture, Claude API, ElevenLabs TTS, and overlay management. Tracks voice state (idle/listening/processing/responding), conversation history, model selection, and cursor visibility. Coordinates the full push-to-talk → screenshot → Claude → TTS → pointing pipeline. |
+| `leanring_buddyApp.swift` | ~126 | Menu bar app entry point. Uses `@NSApplicationDelegateAdaptor` with `CompanionAppDelegate` which creates `MenuBarPanelManager` and starts `CompanionManager`. Handles deep link auth callbacks and Sparkle auto-updates. No main window — the app lives entirely in the status bar. |
+| `CompanionManager.swift` | ~1457 | Central state machine. Owns dictation, shortcut monitoring, screen capture, Claude/Qwen API, ElevenLabs/CosyVoice TTS, and overlay management. Tracks voice state (idle/listening/processing/responding), conversation history, model selection, and cursor visibility. Coordinates the full push-to-talk → screenshot → AI → TTS → pointing pipeline. Dual-mechanism element pointing (Claude text tags + Qwen tool calling). |
 | `MenuBarPanelManager.swift` | ~243 | NSStatusItem + custom NSPanel lifecycle. Creates the menu bar icon, manages the floating companion panel (show/hide/position), installs click-outside-to-dismiss monitor. |
-| `CompanionPanelView.swift` | ~761 | SwiftUI panel content for the menu bar dropdown. Shows companion status, push-to-talk instructions, model picker (Sonnet/Opus), permissions UI, DM feedback button, and quit button. Dark aesthetic using `DS` design system. |
-| `OverlayWindow.swift` | ~881 | Full-screen transparent overlay hosting the blue cursor, response text, waveform, and spinner. Handles cursor animation, element pointing with bezier arcs, multi-monitor coordinate mapping, and fade-out transitions. |
-| `CompanionResponseOverlay.swift` | ~217 | SwiftUI view for the response text bubble and waveform displayed next to the cursor in the overlay. |
-| `CompanionScreenCaptureUtility.swift` | ~132 | Multi-monitor screenshot capture using ScreenCaptureKit. Returns labeled image data for each connected display. |
-| `BuddyDictationManager.swift` | ~866 | Push-to-talk voice pipeline. Handles microphone capture via `AVAudioEngine`, provider-aware permission checks, keyboard/button dictation sessions, transcript finalization, shortcut parsing, contextual keyterms, and live audio-level reporting for waveform feedback. |
-| `BuddyTranscriptionProvider.swift` | ~100 | Protocol surface and provider factory for voice transcription backends. Resolves provider based on `VoiceTranscriptionProvider` in Info.plist — AssemblyAI, OpenAI, or Apple Speech. |
-| `AssemblyAIStreamingTranscriptionProvider.swift` | ~478 | Streaming transcription provider. Fetches temp tokens from the Cloudflare Worker, opens an AssemblyAI v3 websocket, streams PCM16 audio, tracks turn-based transcripts, and delivers finalized text on key-up. Shares a single URLSession across all sessions. |
+| `CompanionPanelView.swift` | ~1687 | SwiftUI panel content for the menu bar dropdown. Shows companion status, push-to-talk instructions, model picker, permissions UI, auth section (sign-in/sign-up/invitation code/email confirmation), plan upgrade section, usage display, and quit button. Dark aesthetic using `DS` design system. |
+| `OverlayWindow.swift` | ~839 | Full-screen transparent overlay hosting the blue cursor, response text, waveform, and spinner. Handles cursor animation, element pointing with bezier arcs, multi-monitor coordinate mapping, and fade-out transitions. |
+| `CompanionResponseOverlay.swift` | ~219 | Cursor-following floating overlay that displays streaming AI response text. Non-activating NSPanel, 60fps cursor tracking, auto-resize, fade-out after streaming. |
+| `CompanionScreenCaptureUtility.swift` | ~167 | Multi-monitor screenshot capture using ScreenCaptureKit. Parallel TaskGroup capture, cursor-screen detection, AppKit coordinate mapping. Returns labeled image data for each connected display. |
+| `BuddyDictationManager.swift` | ~877 | Push-to-talk voice pipeline. Handles microphone capture via `AVAudioEngine`, provider-aware permission checks, keyboard/button dictation sessions, transcript finalization, shortcut parsing, contextual keyterms, and live audio-level reporting for waveform feedback. |
+| `BuddyTranscriptionProvider.swift` | ~76 | Protocol surface and provider factory for voice transcription backends. Resolves provider from APIConfiguration — WhisperKit, AssemblyAI, OpenAI, or Apple Speech. |
+| `AssemblyAIStreamingTranscriptionProvider.swift` | ~490 | Streaming transcription provider. Fetches temp tokens from the Cloudflare Worker, opens an AssemblyAI v3 websocket, streams PCM16 audio, tracks turn-based transcripts, and delivers finalized text on key-up. Shares a single URLSession across all sessions. |
 | `OpenAIAudioTranscriptionProvider.swift` | ~317 | Upload-based transcription provider. Buffers push-to-talk audio locally, uploads as WAV on release, returns finalized transcript. |
 | `AppleSpeechTranscriptionProvider.swift` | ~147 | Local fallback transcription provider backed by Apple's Speech framework. |
 | `BuddyAudioConversionSupport.swift` | ~108 | Audio conversion helpers. Converts live mic buffers to PCM16 mono audio and builds WAV payloads for upload-based providers. |
-| `GlobalPushToTalkShortcutMonitor.swift` | ~132 | System-wide push-to-talk monitor. Owns the listen-only `CGEvent` tap and publishes press/release transitions. |
-| `ClaudeAPI.swift` | ~291 | Claude vision API client with streaming (SSE) and non-streaming modes. TLS warmup optimization, image MIME detection, conversation history support. |
-| `OpenAICompatibleChatAPI.swift` | ~250 | OpenAI-compatible chat API client (SiliconFlow/Qwen). Streaming SSE, tool calling support for element pointing, bearer token auth. |
+| `GlobalPushToTalkShortcutMonitor.swift` | ~147 | System-wide push-to-talk monitor. Owns the listen-only `CGEvent` tap and publishes press/release transitions. Also publishes Cmd+Shift+Space for the cursor input popup. |
+| `ClaudeAPI.swift` | ~310 | Claude vision API client with streaming (SSE) and non-streaming modes. TLS warmup optimization, image MIME detection, conversation history support. |
+| `OpenAICompatibleChatAPI.swift` | ~274 | OpenAI-compatible chat API client (SiliconFlow/Qwen). Streaming SSE, tool calling support for element pointing, bearer token auth. |
 | `OpenAIAPI.swift` | ~142 | OpenAI GPT vision API client. |
-| `ElevenLabsTTSClient.swift` | ~81 | ElevenLabs TTS client. Sends text to the Worker proxy, plays back audio via `AVAudioPlayer`. Exposes `isPlaying` for transient cursor scheduling. |
-| `ElementLocationDetector.swift` | ~335 | Detects UI element locations in screenshots for cursor pointing. |
-| `DesignSystem.swift` | ~880 | Design system tokens — colors, corner radii, shared styles. All UI references `DS.Colors`, `DS.CornerRadius`, etc. |
+| `ElevenLabsTTSClient.swift` | ~97 | ElevenLabs TTS client. Sends text to the Worker proxy, plays back audio via `AVAudioPlayer`. Exposes `isPlaying` for transient cursor scheduling. |
+| `OpenAICompatibleTTSClient.swift` | ~94 | OpenAI-compatible TTS client (CosyVoice2 via SiliconFlow). Same interface as ElevenLabs but with bearer token auth and configurable voice. |
+| `ElementLocationDetector.swift` | ~510 | Detects UI element locations in screenshots for cursor pointing. Dual backend: UI-TARS (SiliconFlow) and Claude Computer Use. Handles coordinate normalization and image resizing. |
+| `DesignSystem.swift` | ~880 | Design system tokens — colors, corner radii, shared styles, button styles, pointer cursor helpers, tooltip, and color utilities. All UI references `DS.Colors`, `DS.CornerRadius`, etc. |
 | `ClickyAnalytics.swift` | ~121 | PostHog analytics integration for usage tracking. |
-| `WindowPositionManager.swift` | ~262 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
+| `WindowPositionManager.swift` | ~252 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
 | `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader for keys stored in the app bundle Info.plist. |
-| `worker/src/index.ts` | ~800 | Cloudflare Worker proxy. Routes: `/chat`, `/tts`, `/quota`, `/create-wechat-order`, `/check-payment-status`, `/wechat-notify`. JWT auth (Supabase ES256), daily quota enforcement, WeChat Pay Native order creation/polling/webhook. Stripe routes commented out (code preserved). |
-| `leanring-buddy/SupabaseAuthManager.swift` | ~350 | Supabase auth manager. Handles sign-up/in/out, JWT session persistence, email confirmation flow, invitation code redemption, and `UserProfile` fetch (plan, quota counts, invite code). |
-| `leanring-buddy/WeChatPayClient.swift` | ~150 | WeChat Pay network client. `createOrder(plan:)` calls Worker `/create-wechat-order` and returns `WeChatPayOrder` (codeURL, outTradeNo, plan, amountFen). `checkPaymentStatus(outTradeNo:)` polls `/check-payment-status`. |
-| `leanring-buddy/StripeCheckoutClient.swift` | ~110 | Stripe checkout client (preserved but unused — Worker routes commented out). `createCheckoutSession(plan:)` and `createPortalSession()` kept for future re-enablement. |
-| `leanring-buddy/UserCenterView.swift` | ~380 | Account center view (Phase 5). Inline panel swap from the account icon. Shows plan badge, daily/total usage, invite code. Free users see WeChat Pay QR code flow (CoreImage QR generation, 3-second polling, success state). Paid users see plan info. |
+| `APIConfiguration.swift` | ~406 | Centralized API configuration with Keychain-backed secrets. Manages chat (Anthropic/OpenAI-compatible), TTS (ElevenLabs/OpenAI-compatible), STT (WhisperKit/AssemblyAI/OpenAI/Apple), and element detection providers. Preset support for SiliconFlow and Anthropic. |
+| `APISettingsView.swift` | ~537 | Settings panel for configuring chat, TTS, STT, and element detection API endpoints/keys/models. Includes WhisperKit model download status and reset buttons. |
+| `AppLanguage.swift` | ~103 | Language enum (English/Chinese/Japanese), per-language voice identifiers for NSSpeechSynthesizer and CosyVoice2, Claude response language instructions, and LocalizationManager singleton. |
+| `GeneralSettingsView.swift` | ~143 | General settings panel with language selector and response text overlay toggle. |
+| `OnboardingGuideManager.swift` | ~173 | Step-by-step text bubble onboarding system. 4 progressive steps (welcome → text input → cursor popup → voice interaction) with character-streaming animation and auto-advance on completion. |
+| `SceneContextDetector.swift` | ~168 | Detects frontmost app and focused window title via AX API. Provides app-specific quick action presets for code editors, browsers, terminals, design tools, and video editors. |
+| `CursorInputPopupManager.swift` | ~189 | Manages the cursor-following text input popup (Cmd+Shift+Space). Creates a key-capable NSPanel positioned near the mouse cursor with click-outside and escape dismissal. |
+| `CursorInputPopupView.swift` | ~136 | SwiftUI view for the cursor input popup. Quick action chips grid + text input field with submit action. |
+| `WhisperKitModelManager.swift` | ~132 | WhisperKit on-device model lifecycle. Handles model download, state tracking, and readiness checks. |
+| `WhisperKitTranscriptionProvider.swift` | ~183 | On-device WhisperKit transcription provider. Accumulates PCM audio, resamples to 16kHz, and runs local inference on key-up. |
+| `worker/src/index.ts` | ~1622 | Cloudflare Worker proxy. Routes: `/chat`, `/tts`, `/quota`, `/create-wechat-order`, `/check-payment-status`, `/wechat-notify`. JWT auth (Supabase ES256), daily quota enforcement, WeChat Pay Native order creation/polling/webhook. Stripe handlers preserved but routes commented out. |
+| `SupabaseAuthManager.swift` | ~752 | Supabase auth manager. Handles Apple Sign In, email sign-up/in/out, JWT session persistence (Keychain), token refresh, email confirmation deep links, invitation code redemption, and `UserProfile` fetch (plan, quota counts, invite code). |
+| `WeChatPayClient.swift` | ~149 | WeChat Pay network client. `createOrder(plan:)` calls Worker `/create-wechat-order` and returns `WeChatPayOrder` (codeURL, outTradeNo, plan, amountFen). `checkPaymentStatus(outTradeNo:)` polls `/check-payment-status`. |
+| `StripeCheckoutClient.swift` | ~155 | Stripe checkout client (preserved but unused — Worker routes commented out). `createCheckoutSession(plan:)` and `createPortalSession()` kept for future re-enablement. |
+| `UserCenterView.swift` | ~735 | Account center view. Shows plan badge, daily/total usage, invite code with copy, WeChat Pay QR code flow (CoreImage QR generation, 3-second polling, success state), paid user info card, and sign out. |
 
 ## Build & Run
 
